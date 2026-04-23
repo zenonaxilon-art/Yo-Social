@@ -46,6 +46,12 @@ export default function App() {
   useEffect(() => {
     document.documentElement.classList.add('dark');
     
+    // Only try to use supabase if it's actually configured
+    if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+      setSessionChecked(true); // Stop loading layout
+      return;
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {

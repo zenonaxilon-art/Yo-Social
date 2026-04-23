@@ -17,12 +17,15 @@ export default function Auth() {
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
 
+  const isConfigured = !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY;
+
   if (user) {
     return <Navigate to="/" replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isConfigured) return;
     setLoading(true);
     setError(null);
 
@@ -62,6 +65,13 @@ export default function Auth() {
             {isLogin ? 'Welcome back' : 'Join Yo Social'}
           </h1>
         </div>
+
+        {!isConfigured && (
+          <div className="bg-red-500/10 border border-red-500/50 text-red-500 p-4 rounded-xl mb-6 text-sm">
+            <p className="font-bold mb-1">Supabase API Keys Missing</p>
+            <p>Please configure <code className="bg-background px-1 py-0.5 rounded">VITE_SUPABASE_URL</code> and <code className="bg-background px-1 py-0.5 rounded">VITE_SUPABASE_ANON_KEY</code> in your environment variables to enable authentication and database features.</p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
@@ -119,10 +129,10 @@ export default function Auth() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !isConfigured}
             className={cn(
               "w-full bg-primary text-primary-foreground font-bold rounded-lg py-3 mt-2 transition-opacity hover:opacity-90",
-              loading && "opacity-70 cursor-not-allowed"
+              (loading || !isConfigured) && "opacity-70 cursor-not-allowed"
             )}
           >
             {loading ? 'Processing...' : isLogin ? 'Log in' : 'Sign up'}

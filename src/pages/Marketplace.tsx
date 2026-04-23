@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { Store } from 'lucide-react';
+import { EmptyState } from '../components/UIStates';
 
 export default function Marketplace() {
   const [items, setItems] = useState<any[]>([]);
@@ -25,10 +27,19 @@ export default function Marketplace() {
       
       <div className="p-4 sm:p-8 grid grid-cols-2 gap-4">
         {loading ? (
-             <div className="col-span-2 text-center text-muted-foreground p-10">Loading marketplace...</div>
+             <div className="col-span-2 grid grid-cols-2 gap-4">
+                <div className="aspect-square bg-card border border-border rounded-2xl animate-pulse"></div>
+                <div className="aspect-square bg-card border border-border rounded-2xl animate-pulse"></div>
+                <div className="aspect-square bg-card border border-border rounded-2xl animate-pulse"></div>
+                <div className="aspect-square bg-card border border-border rounded-2xl animate-pulse"></div>
+             </div>
         ) : items.length === 0 ? (
-          <div className="col-span-2 text-center text-muted-foreground mt-10">
-            No items for sale yet.
+          <div className="col-span-2">
+           <EmptyState 
+             icon={<Store size={32} />}
+             title="Marketplace is empty"
+             description="There are no items listed for sale yet. Check back later!"
+           />
           </div>
         ) : (
           items.map(item => (

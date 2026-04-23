@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../lib/store';
-import { UserPlus, Heart, MessageCircle } from 'lucide-react';
+import { UserPlus, Heart, MessageCircle, BellOff } from 'lucide-react';
 import { formatRelativeTime } from '../lib/utils';
 import { Link } from 'react-router-dom';
+import { EmptyState } from '../components/UIStates';
 
 export default function Notifications() {
   const { user } = useAppStore();
@@ -52,12 +53,17 @@ export default function Notifications() {
       </div>
       <div className="px-4 sm:px-8 py-6 space-y-4">
         {loading ? (
-          <div className="p-4 flex justify-center"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div></div>
+           <div className="space-y-4">
+             <div className="h-20 bg-card border border-border rounded-2xl animate-pulse"></div>
+             <div className="h-20 bg-card border border-border rounded-2xl animate-pulse"></div>
+             <div className="h-20 bg-card border border-border rounded-2xl animate-pulse"></div>
+           </div>
         ) : notifications.length === 0 ? (
-          <div className="p-8 text-center text-muted-foreground mt-10 bg-card border border-border rounded-2xl">
-            <div className="font-extrabold text-3xl text-foreground mb-2">Nothing to see here — yet</div>
-            <p>From likes to follows, they'll show up here.</p>
-          </div>
+          <EmptyState 
+            icon={<BellOff size={32} />}
+            title="Nothing to see here — yet"
+            description="From likes to follows, your notifications will show up here."
+          />
         ) : (
           notifications.map((n) => (
             <div key={n.id} className={`flex gap-4 p-5 border border-border rounded-2xl transition-colors cursor-pointer ${!n.is_read ? 'bg-muted/20' : 'bg-card hover:border-muted-foreground/30'}`}>

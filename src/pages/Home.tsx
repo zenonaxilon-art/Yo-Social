@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../lib/store';
-import { Image as ImageIcon, Sparkles } from 'lucide-react';
+import { Image as ImageIcon, Sparkles, Search, MessageSquareX } from 'lucide-react';
 import { cn, formatRelativeTime } from '../lib/utils';
 import { Link } from 'react-router-dom';
+import { PostSkeleton, EmptyState } from '../components/UIStates';
 
 export default function Home() {
   const { profile } = useAppStore();
@@ -11,6 +12,8 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [content, setContent] = useState('');
   const [posting, setPosting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeQuery, setActiveQuery] = useState('');
 
   useEffect(() => {
     fetchPosts();
@@ -24,12 +27,11 @@ export default function Home() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [activeQuery]);
 
   const fetchPosts = async () => {
-    // In a real app we'd join with users, likes, comments. 
-    // Here we simulate the join or rely on Supabase foreign keys if set up correctly.
-    const { data } = await supabase
+    setLoading(true);
+    let query = supabase
       .from('posts')
       .select(`
         *,
@@ -38,6 +40,11 @@ export default function Home() {
       .order('created_at', { ascending: false })
       .limit(50);
       
+    if (activeQuery.trim()) {
+      query = query.ilike('content', `%${activeQuery}%`);
+    }
+
+    const { data } = await query;
     if (data) setPosts(data);
     setLoading(false);
   };
@@ -59,12 +66,27 @@ export default function Home() {
     }
   };
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setActiveQuery(searchQuery);
+  };
+
   return (
     <div className="w-full relative">
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="flex justify-between items-center px-4 py-3 cursor-pointer">
-          <h1 className="text-xl font-bold">Home</h1>
-          <Sparkles className="text-primary w-5 h-5" />
+        <div className="flex justify-between items-center px-4 py-3 gap-4">
+          <h1 className="text-xl font-bold hidden sm:block shrink-0">Home</h1>
+          <form onSubmit={handleSearch} className="flex-1 max-w-md relative">
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
+            <input 
+              type="text" 
+              placeholder="Search posts..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-muted/30 border border-border rounded-full py-2 pl-9 pr-4 text-[14px] focus:outline-none focus:border-primary transition-colors placeholder:text-muted-foreground"
+            />
+          </form>
+          <Sparkles className="text-primary w-5 h-5 shrink-0" />
         </div>
         <div className="flex">
           <div className="flex-1 text-center py-3 font-bold border-b-4 border-primary hover:bg-muted transition-colors cursor-pointer">For you</div>
@@ -106,19 +128,19 @@ export default function Home() {
       </div>
 
       {/* Feed */}
-      <div className="px-4 sm:px-8 pb-8 space-y-6">
+      <div className="px-4 sm:px-8 pb-8 space-y-4">
         {loading ? (
-          <div className="p-4 space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex gap-3 animate-pulse">
-                <div className="w-10 h-10 rounded-full bg-muted shrink-0"></div>
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-muted rounded w-1/3"></div>
-                  <div className="h-4 bg-muted rounded w-3/4"></div>
-                </div>
-              </div>
-            ))}
+          <div>
+            <PostSkeleton />
+            <PostSkeleton />
+            <PostSkeleton />
           </div>
+        ) : posts.length === 0 ? (
+          <EmptyState 
+             icon={<MessageSquareX size={32} />} 
+             title={activeQuery ? "No matching posts" : "No posts yet"} 
+             description={activeQuery ? `We couldn't find any posts matching "${activeQuery}".` : "Be the first to share your thoughts!"}
+          />
         ) : (
           posts.map((post) => (
             <PostCard key={post.id} post={post} />

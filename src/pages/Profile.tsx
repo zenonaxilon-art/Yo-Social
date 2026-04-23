@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../lib/store';
-import { ArrowLeft, Calendar, User } from 'lucide-react';
+import { ArrowLeft, Calendar, User, MessageSquareOff } from 'lucide-react';
 import { formatRelativeTime } from '../lib/utils';
+import { PostSkeleton, EmptyState } from '../components/UIStates';
 
 export default function Profile() {
   const { username } = useParams<{ username: string }>();
@@ -130,12 +131,13 @@ export default function Profile() {
       </div>
       
       {/* Posts list */}
-      <div className="px-4 sm:px-8 py-6 space-y-6">
+      <div className="px-4 sm:px-8 py-6 space-y-4">
         {posts.length === 0 ? (
-          <div className="p-8 text-center text-muted-foreground mt-10 bg-card border border-border rounded-2xl">
-            <h1 className="text-3xl font-extrabold text-foreground mb-2">No posts yet</h1>
-            <p>Once you post, they will show up here.</p>
-          </div>
+          <EmptyState 
+            icon={<MessageSquareOff size={32} />}
+            title="No posts yet"
+            description={isOwnProfile ? "When you post, they will show up here." : "This user hasn't posted anything yet."}
+          />
         ) : (
           posts.map(post => (
              <article key={post.id} className="bg-card border border-border rounded-2xl p-5 hover:border-muted-foreground/30 transition-colors cursor-pointer">

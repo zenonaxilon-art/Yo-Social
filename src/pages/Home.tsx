@@ -124,16 +124,22 @@ export default function Home() {
         image_url = publicUrlData.publicUrl;
       }
 
-      await supabase.from('posts').insert({
+      const { error: insertError } = await supabase.from('posts').insert({
         user_id: profile.id,
         content: content.trim(),
         image_url
       });
+
+      if (insertError) {
+         console.error("Supabase insert error:", insertError);
+         throw insertError;
+      }
+
       setContent('');
       removeImage();
-    } catch (e) {
+    } catch (e: any) {
       console.error("Error posting:", e);
-      alert("Failed to create post.");
+      alert("Failed to create post: " + (e.message || "Unknown error"));
     } finally {
       setPosting(false);
     }

@@ -2,21 +2,22 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../lib/store';
 import { Navigate } from 'react-router-dom';
-import { Search, ShieldAlert, Trash2, Ban } from 'lucide-react';
+import { Search, ShieldAlert, Trash2, Ban, Check, X } from 'lucide-react';
 
 export default function Admin() {
   const { profile } = useAppStore();
   const [users, setUsers] = useState<any[]>([]);
+  const [sellerRequests, setSellerRequests] = useState<any[]>([]);
   const [search, setSearch] = useState('');
 
   // Check admin status early based on profile properties
-  // Pre-created admin info should trigger this, we rely on DB `is_admin` true.
   if (!profile || !profile.is_admin) {
     return <Navigate to="/" replace />;
   }
 
   useEffect(() => {
     fetchUsers();
+    fetchSellerRequests();
   }, [search]);
 
   const fetchUsers = async () => {
@@ -26,6 +27,13 @@ export default function Admin() {
     }
     const { data } = await query;
     if (data) setUsers(data);
+  };
+  
+  const fetchSellerRequests = async () => {
+     try {
+       const { data } = await supabase.from('seller_requests').select('*, user:user_id(*)').eq('status', 'pending');
+       if (data) setSellerRequests(data);
+     } catch(e) {}
   };
 
   const toggleVerified = async (userId: string, currentStatus: boolean) => {
@@ -37,6 +45,21 @@ export default function Admin() {
        setUsers(users.map(u => u.id === userId ? { ...u, is_verified: !currentStatus } : u));
     }
   };
+  
+  const handleSellerRequest = async (requestId: string, userId: string, action: 'approved' | 'rejected') => {
+      try {
+         await supabase.from('seller_requests').update({ status: action }).eq('id', requestId);
+         if (action === 'approved') {
+            await supabase.from('users').update({ role: 'seller' }).eq('id', userId);
+         }
+         
+         // Dispatch success visual
+         setSellerRequests(prev => prev.filter(r => r.id !== requestId));
+      } catch(err) {
+         console.error(err);
+         alert("Failed to process request.");
+      }
+  };
 
   return (
     <div className="w-full min-h-screen">
@@ -46,6 +69,27 @@ export default function Admin() {
       </div>
       
       <div className="p-4">
+        {sellerRequests.length > 0 && (
+           <div className="mb-8">
+              <h2 className="font-bold text-lg mb-4 flex items-center gap-2">Pending Seller Applications <span className="bg-red-500 text-white rounded-full px-2 text-xs">{sellerRequests.length}</span></h2>
+              <div className="grid gap-3">
+                 {sellerRequests.map(req => (
+                    <div key={req.id} className="bg-card border border-border p-4 rounded-xl flex justify-between items-center gap-4">
+                       <div>
+                          <div className="font-bold">{req.business_name}</div>
+                          <div className="text-sm text-foreground/80 mb-2">{req.description}</div>
+                          <div className="text-xs text-muted-foreground">Requested by @{req.user?.username} ({req.user?.display_name})</div>
+                       </div>
+                       <div className="flex gap-2">
+                          <button onClick={() => handleSellerRequest(req.id, req.user_id, 'approved')} className="w-10 h-10 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center hover:bg-green-500 hover:text-white transition-colors"><Check size={20}/></button>
+                          <button onClick={() => handleSellerRequest(req.id, req.user_id, 'rejected')} className="w-10 h-10 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors"><X size={20}/></button>
+                       </div>
+                    </div>
+                 ))}
+              </div>
+           </div>
+        )}
+
         <div className="relative mb-6">
           <Search className="absolute left-3 top-3 text-muted-foreground w-5 h-5" />
           <input

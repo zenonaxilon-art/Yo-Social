@@ -90,6 +90,32 @@ create table public.verification_requests (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
+-- Seller Requests
+create table public.seller_requests (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references public.users on delete cascade not null,
+  business_name text not null,
+  description text not null,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Note: To apply this retroactively directly in the SQL Editor:
+/*
+create table public.seller_requests (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references public.users on delete cascade not null,
+  business_name text not null,
+  description text not null,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+alter table public.seller_requests enable row level security;
+create policy "Users can view own requests" on public.seller_requests for select using (auth.uid() = user_id or (select is_admin from public.users where id = auth.uid()) = true);
+create policy "Users can request seller" on public.seller_requests for insert with check (auth.uid() = user_id);
+create policy "Admins can update seller requests" on public.seller_requests for update using ((select is_admin from public.users where id = auth.uid()) = true);
+*/
+
 -- Reports Table
 create table public.reports (
   id uuid default uuid_generate_v4() primary key,
@@ -161,6 +187,12 @@ create policy "Users can delete own bookmarks" on public.bookmarks for delete us
 alter table public.verification_requests enable row level security;
 create policy "Users can view own requests" on public.verification_requests for select using (auth.uid() = user_id);
 create policy "Users can request verification" on public.verification_requests for insert with check (auth.uid() = user_id);
+
+-- Seller Requests: Insert self, Read self/admin, Update admin
+alter table public.seller_requests enable row level security;
+create policy "Users can view own requests" on public.seller_requests for select using (auth.uid() = user_id or (select is_admin from public.users where id = auth.uid()) = true);
+create policy "Users can request seller" on public.seller_requests for insert with check (auth.uid() = user_id);
+create policy "Admins can update seller requests" on public.seller_requests for update using ((select is_admin from public.users where id = auth.uid()) = true);
 
 -- Likes: Read all, insert self, delete self
 alter table public.likes enable row level security;

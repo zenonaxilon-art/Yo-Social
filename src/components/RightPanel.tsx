@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Search } from 'lucide-react';
+import { Search, BadgeCheck } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../lib/store';
 
@@ -67,17 +67,24 @@ export default function RightPanel() {
           ) : users.length === 0 ? (
             <div className="text-sm text-muted-foreground">No users found.</div>
           ) : (
-            users.map(u => (
+            users.map(u => {
+              const showGoldBadge = u.role === 'creator' || u.role === 'admin' || u.role === 'seller';
+              return (
               <Link to={`/profile/${u.username}`} key={u.id} className="flex gap-3 hover:bg-muted/80 px-2 -mx-2 py-2 rounded-xl transition-colors cursor-pointer items-center">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white overflow-hidden shrink-0 flex items-center justify-center font-bold">
                   {u.profile_picture_url ? <img src={u.profile_picture_url} className="w-full h-full object-cover" alt="" /> : u.display_name?.charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-[15px] truncate">{u.display_name}</div>
+                  <div className="font-semibold text-[15px] truncate flex items-center gap-1">
+                     {u.display_name}
+                     {u.is_verified && (
+                       <svg viewBox="0 0 24 24" aria-label="Verified account" className={`w-[14px] h-[14px] fill-current shrink-0 ${showGoldBadge ? "text-yellow-500" : "text-accent"}`}><g><path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.918-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.337 2.25c-.416-.165-.866-.25-1.336-.25-2.21 0-3.918 1.792-3.918 4 0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.46.756 2.75 1.88 3.447-.077.387-.12.784-.12 1.18 0 2.21 1.708 3.998 3.917 3.998.47 0 .92-.086 1.336-.252C9.182 21.587 10.49 22.5 12 22.5s2.816-.915 3.336-2.252c.417.166.868.252 1.336.252 2.21 0 3.918-1.79 3.918-4 0-.398-.043-.795-.12-1.182 1.124-.697 1.88-1.986 1.88-3.447zM10.446 16l-3.3-3.03 1.144-1.246 2.155 1.97 5.56-5.56 1.25 1.186-6.81 6.68z"></path></g></svg>
+                     )}
+                  </div>
                   <div className="text-[12px] text-muted-foreground truncate">@{u.username}</div>
                 </div>
               </Link>
-            ))
+            )})
           )}
         </div>
       </div>

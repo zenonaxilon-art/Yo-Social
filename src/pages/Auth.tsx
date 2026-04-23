@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Navigate } from 'react-router-dom';
 import { useAppStore } from '../lib/store';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, MailCheck } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export default function Auth() {
@@ -10,6 +10,7 @@ export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Form states
   const [email, setEmail] = useState('');
@@ -28,6 +29,7 @@ export default function Auth() {
     if (!isConfigured) return;
     setLoading(true);
     setError(null);
+    setSuccessMessage(null);
 
     try {
       if (isLogin) {
@@ -37,7 +39,7 @@ export default function Auth() {
         });
         if (error) throw error;
       } else {
-        const { error: signUpError } = await supabase.auth.signUp({
+        const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -48,6 +50,14 @@ export default function Auth() {
           }
         });
         if (signUpError) throw signUpError;
+        
+        if (data.user && !data.session) {
+           setSuccessMessage("Success! We've sent a confirmation link to your email. Please click it to verify your account, then return here to log in.");
+           return;
+        } else {
+           setSuccessMessage("Account created successfully! You can now log in.");
+           setIsLogin(true);
+        }
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred during authentication.');
@@ -55,6 +65,30 @@ export default function Auth() {
       setLoading(false);
     }
   };
+
+  if (successMessage && !isLogin && successMessage.includes('confirmation link')) {
+    return (
+       <div className="min-h-screen flex items-center justify-center bg-background px-4">
+         <div className="w-full max-w-[400px] text-center space-y-6">
+            <div className="mx-auto w-16 h-16 bg-primary/20 text-primary rounded-full flex items-center justify-center">
+              <MailCheck size={32} />
+            </div>
+            <h1 className="text-2xl font-bold text-foreground">Check your email</h1>
+            <p className="text-muted-foreground">{successMessage}</p>
+            <button 
+              onClick={() => {
+                setIsLogin(true);
+                setSuccessMessage(null);
+                setPassword(''); // Clear password for security
+              }}
+              className="w-full bg-primary text-primary-foreground font-bold rounded-lg py-3 mt-4 hover:opacity-90 transition-opacity"
+            >
+              Back to login
+            </button>
+         </div>
+       </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -77,6 +111,12 @@ export default function Auth() {
           {error && (
             <div className="p-3 text-sm text-red-500 bg-red-500/10 rounded-md">
               {error}
+            </div>
+          )}
+          
+          {successMessage && (
+            <div className="p-3 text-sm text-primary bg-primary/10 rounded-md">
+              {successMessage}
             </div>
           )}
 
@@ -147,6 +187,7 @@ export default function Auth() {
             onClick={() => {
               setIsLogin(!isLogin);
               setError(null);
+              setSuccessMessage(null);
             }}
             className="text-accent hover:underline font-bold"
           >

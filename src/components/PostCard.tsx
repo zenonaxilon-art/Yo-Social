@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAppStore } from '../lib/store';
 import { Link } from 'react-router-dom';
 import { formatRelativeTime } from '../lib/utils';
-import { Heart, MessageCircle, Trash2, Send, Bookmark, Sparkles } from 'lucide-react';
+import { Heart, MessageCircle, Trash2, Send, Bookmark, BadgeCheck } from 'lucide-react';
 
 export default function PostCard({ post, onDelete, onUpdate }: { post: any, onDelete?: (id: string) => void, onUpdate?: () => void }) {
   const { profile } = useAppStore();

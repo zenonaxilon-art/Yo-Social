@@ -2,14 +2,14 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../lib/store';
-import { ArrowLeft, Calendar, User, MessageSquareOff, Link as LinkIcon, BadgeCheck } from 'lucide-react';
+import { ArrowLeft, Calendar, User, MessageSquareOff, Link as LinkIcon, BadgeCheck, X, Camera, Loader2 } from 'lucide-react';
 import { formatRelativeTime, cn } from '../lib/utils';
 import { PostSkeleton, EmptyState } from '../components/UIStates';
 import PostCard from '../components/PostCard';
 
 export default function Profile() {
   const { username } = useParams<{ username: string }>();
-  const { profile: currentUser } = useAppStore();
+  const { profile: currentUser, setProfile: setGlobalProfile } = useAppStore();
   const [profile, setProfile] = useState<any>(null);
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -17,6 +17,19 @@ export default function Profile() {
   const [followStats, setFollowStats] = useState({ followers: 0, following: 0 });
   const [activeTab, setActiveTab] = useState<'posts' | 'replies' | 'media' | 'likes'>('posts');
   const [requestSent, setRequestSent] = useState(false);
+
+  // Edit Profile States
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    display_name: '',
+    bio: '',
+    website_url: ''
+  });
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -27,6 +40,11 @@ export default function Profile() {
     const { data: user } = await supabase.from('users').select('*').eq('username', username).single();
     if (user) {
       setProfile(user);
+      setEditForm({
+         display_name: user.display_name || '',
+         bio: user.bio || '',
+         website_url: user.website_url || ''
+      });
       
       const { data: userPosts } = await supabase.from('posts').select(`*, users:user_id ( username, display_name, profile_picture_url, is_verified, role )`).eq('user_id', user.id).order('created_at', { ascending: false });
       if (userPosts) setPosts(userPosts);
@@ -77,6 +95,78 @@ export default function Profile() {
       console.log(e);
       // Fallback optimistic
       setRequestSent(true);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+      if (!currentUser || !profile) return;
+      setIsSaving(true);
+      
+      try {
+        let finalAvatarUrl = profile.profile_picture_url;
+        let finalBannerUrl = profile.banner_url;
+
+        // Upload Avatar
+        if (avatarFile) {
+          const fileExt = avatarFile.name.split('.').pop();
+          const fileName = `${currentUser.id}-avatar-${Date.now()}.${fileExt}`;
+          const { data, error } = await supabase.storage.from('avatars').upload(fileName, avatarFile, { upsert: true });
+          if (data) {
+             const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
+             finalAvatarUrl = publicUrl;
+          }
+        }
+
+        // Upload Banner
+        if (bannerFile) {
+          const fileExt = bannerFile.name.split('.').pop();
+          const fileName = `${currentUser.id}-banner-${Date.now()}.${fileExt}`;
+          const { data } = await supabase.storage.from('avatars').upload(fileName, bannerFile, { upsert: true });
+          if (data) {
+             const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
+             finalBannerUrl = publicUrl;
+          }
+        }
+
+        // Update User records
+        const updates = {
+          display_name: editForm.display_name.trim() || profile.display_name,
+          bio: editForm.bio.trim(),
+          website_url: editForm.website_url.trim(),
+          profile_picture_url: finalAvatarUrl,
+          banner_url: finalBannerUrl
+        };
+
+        const { error } = await supabase.from('users').update(updates).eq('id', currentUser.id);
+        
+        if (!error) {
+           const updatedProfile = { ...profile, ...updates };
+           setProfile(updatedProfile);
+           setGlobalProfile({ ...currentUser, ...updates });
+           setIsEditing(false);
+           setAvatarFile(null);
+           setBannerFile(null);
+        }
+      } catch (err) {
+         console.error('Failed to update profile', err);
+      } finally {
+         setIsSaving(false);
+      }
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+       const file = e.target.files[0];
+       setAvatarFile(file);
+       setAvatarPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleBannerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+       const file = e.target.files[0];
+       setBannerFile(file);
+       setBannerPreview(URL.createObjectURL(file));
     }
   };
 
@@ -136,7 +226,7 @@ export default function Profile() {
                  </button>
              )}
              {isOwnProfile ? (
-                 <button className="font-bold border border-border rounded-full px-4 py-1.5 hover:bg-muted transition-colors">Edit profile</button>
+                 <button onClick={() => setIsEditing(true)} className="font-bold border border-border rounded-full px-4 py-1.5 hover:bg-muted transition-colors">Edit profile</button>
              ) : (
                 <div className="flex gap-2">
                  <Link to={`/messages/${profile.id}`} className="font-bold rounded-full p-1.5 transition-colors border border-border flex items-center justify-center w-9 h-9 hover:bg-muted">
@@ -208,6 +298,87 @@ export default function Profile() {
           ))
         )}
       </div>
+
+      {isEditing && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-card w-full max-w-[600px] border border-border rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
+             <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/80 backdrop-blur sticky top-0 z-10 rounded-t-2xl">
+               <div className="flex items-center gap-6">
+                 <button onClick={() => setIsEditing(false)} className="hover:bg-muted p-2 rounded-full transition-colors"><X size={20} /></button>
+                 <h2 className="text-xl font-bold">Edit profile</h2>
+               </div>
+               <button onClick={handleSaveProfile} disabled={isSaving} className="bg-foreground text-background font-bold px-4 py-1.5 rounded-full hover:bg-foreground/90 disabled:opacity-50 flex items-center gap-2">
+                 {isSaving && <Loader2 size={16} className="animate-spin" />}
+                 Save
+               </button>
+             </div>
+             
+             <div className="overflow-y-auto overflow-x-hidden flex-1 relative pb-8">
+                <div className="h-48 bg-muted relative group">
+                  {(bannerPreview || profile.banner_url) ? (
+                    <img src={bannerPreview || profile.banner_url} className="w-full h-full object-cover" />
+                  ) : <div className="w-full h-full bg-gradient-to-tr from-muted-foreground/30 to-muted/10"></div>}
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <label className="w-10 h-10 bg-black/60 rounded-full flex items-center justify-center text-white cursor-pointer hover:bg-black/80 transition-colors">
+                      <Camera size={20} />
+                      <input type="file" accept="image/*" className="hidden" onChange={handleBannerChange} />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="px-4">
+                  <div className="w-28 h-28 rounded-full border-4 border-background bg-muted -mt-14 relative group overflow-hidden shrink-0">
+                    {(avatarPreview || profile.profile_picture_url) ? (
+                      <img src={avatarPreview || profile.profile_picture_url} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center"><User size={48} className="text-muted-foreground" /></div>
+                    )}
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <label className="w-10 h-10 bg-black/60 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-black/80 transition-colors">
+                        <Camera size={20} />
+                        <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="space-y-5 mt-4">
+                    <div className="space-y-1 relative border border-border rounded bg-transparent p-2 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary flex flex-col transition-all">
+                      <label className="text-xs text-muted-foreground font-medium px-1">Name</label>
+                      <input 
+                        type="text" 
+                        value={editForm.display_name}
+                        onChange={(e) => setEditForm({...editForm, display_name: e.target.value})}
+                        className="bg-transparent border-none outline-none px-1 text-[15px] text-foreground w-full placeholder:text-muted-foreground/50"
+                        placeholder="Add your name"
+                      />
+                    </div>
+                    
+                    <div className="space-y-1 relative border border-border rounded bg-transparent p-2 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary flex flex-col transition-all">
+                      <label className="text-xs text-muted-foreground font-medium px-1">Bio</label>
+                      <textarea 
+                        value={editForm.bio}
+                        onChange={(e) => setEditForm({...editForm, bio: e.target.value})}
+                        className="bg-transparent border-none outline-none px-1 text-[15px] text-foreground w-full resize-none min-h-[80px] placeholder:text-muted-foreground/50"
+                        placeholder="Add your bio"
+                      />
+                    </div>
+                    
+                    <div className="space-y-1 relative border border-border rounded bg-transparent p-2 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary flex flex-col transition-all">
+                      <label className="text-xs text-muted-foreground font-medium px-1">Website</label>
+                      <input 
+                        type="text" 
+                        value={editForm.website_url}
+                        onChange={(e) => setEditForm({...editForm, website_url: e.target.value})}
+                        className="bg-transparent border-none outline-none px-1 text-[15px] text-foreground w-full placeholder:text-muted-foreground/50"
+                        placeholder="Add a website"
+                      />
+                    </div>
+                  </div>
+                </div>
+             </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

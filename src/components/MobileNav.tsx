@@ -17,7 +17,10 @@ export default function MobileNav() {
   ];
 
   return (
-    <div className="sm:hidden fixed bottom-0 w-full bg-background border-t border-border flex justify-around items-center h-16 z-50 px-1">
+    <div 
+      className="sm:hidden fixed bottom-0 w-full bg-background/90 backdrop-blur-md border-t border-border flex justify-around items-center z-50 px-1"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)', height: 'calc(4rem + env(safe-area-inset-bottom))' }}
+    >
       {navItems.map((item) => {
         const isActive = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path));
         const Icon = item.icon;

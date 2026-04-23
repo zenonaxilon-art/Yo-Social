@@ -18,6 +18,10 @@ create table public.users (
   is_online boolean default false,
   is_verified boolean default false,
   is_admin boolean default false,
+  xp integer default 0,
+  level integer default 1,
+  streak integer default 0,
+  last_login timestamp with time zone,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -115,6 +119,35 @@ create policy "Users can view own requests" on public.seller_requests for select
 create policy "Users can request seller" on public.seller_requests for insert with check (auth.uid() = user_id);
 create policy "Admins can update seller requests" on public.seller_requests for update using ((select is_admin from public.users where id = auth.uid()) = true);
 */
+
+-- Shorts Table
+create table public.shorts (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references public.users on delete cascade not null,
+  video_url text not null,
+  caption text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Communities table
+create table public.communities (
+  id uuid default uuid_generate_v4() primary key,
+  creator_id uuid references public.users on delete cascade not null,
+  name text not null unique,
+  description text,
+  banner_url text,
+  icon_url text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Community Members
+create table public.community_members (
+  community_id uuid references public.communities on delete cascade not null,
+  user_id uuid references public.users on delete cascade not null,
+  role text default 'member' check (role in ('member', 'moderator', 'admin')),
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  primary key (community_id, user_id)
+);
 
 -- Reports Table
 create table public.reports (

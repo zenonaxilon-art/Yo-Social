@@ -32,11 +32,13 @@ create table public.posts (
   content text not null,
   image_url text,
   original_post_id uuid references public.posts(id) on delete cascade,
+  community_id uuid references public.communities(id) on delete cascade,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- Note: to retroactively add original_post_id to an existing table, run:
+-- Note: to retroactively add columns to an existing table, run:
 -- alter table public.posts add column original_post_id uuid references public.posts(id) on delete cascade;
+-- alter table public.posts add column community_id uuid references public.communities(id) on delete cascade;
 
 -- Likes Table
 create table public.likes (
@@ -135,10 +137,14 @@ create table public.communities (
   creator_id uuid references public.users on delete cascade not null,
   name text not null unique,
   description text,
+  rules text,
   banner_url text,
   icon_url text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+-- Note:
+-- alter table public.communities add column rules text;
 
 -- Community Members
 create table public.community_members (

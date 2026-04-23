@@ -14,6 +14,9 @@ import Sidebar from './components/Sidebar';
 import RightPanel from './components/RightPanel';
 import MobileNav from './components/MobileNav';
 
+import Communities from './pages/Communities';
+import CommunityDetail from './pages/CommunityDetail';
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, sessionChecked } = useAppStore();
 
@@ -113,6 +116,8 @@ export default function App() {
           <Route path="messages" element={<Inbox />} />
           <Route path="messages/:userId" element={<Inbox />} />
           <Route path="marketplace" element={<Marketplace />} />
+          <Route path="communities" element={<Communities />} />
+          <Route path="communities/:id" element={<CommunityDetail />} />
           <Route path="profile/:username" element={<Profile />} />
           <Route path="admin" element={<Admin />} />
         </Route>

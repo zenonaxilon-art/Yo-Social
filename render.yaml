@@ -5,7 +5,7 @@ services:
     buildCommand: npm install && npm run build
     staticPublishPath: dist
     envVars:
-      - key: VITE_SUPABASE_URL
+      - key: https://rtshrshtfmfowollahpj.supabase.co
         sync: false
-      - key: VITE_SUPABASE_ANON_KEY
+      - key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0c2hyc2h0Zm1mb3dvbGxhaHBqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MDgyNjQsImV4cCI6MjA5MjQ4NDI2NH0.WotwLCtoTPlJs-tcUs2Lki0OpyneUk1-t4RjH6syyog
         sync: false

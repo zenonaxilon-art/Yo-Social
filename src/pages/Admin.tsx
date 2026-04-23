@@ -8,6 +8,7 @@ export default function Admin() {
   const { profile } = useAppStore();
   const [users, setUsers] = useState<any[]>([]);
   const [sellerRequests, setSellerRequests] = useState<any[]>([]);
+  const [reports, setReports] = useState<any[]>([]);
   const [search, setSearch] = useState('');
 
   // Check admin status early based on profile properties
@@ -18,6 +19,7 @@ export default function Admin() {
   useEffect(() => {
     fetchUsers();
     fetchSellerRequests();
+    fetchReports();
   }, [search]);
 
   const fetchUsers = async () => {
@@ -34,6 +36,13 @@ export default function Admin() {
        const { data } = await supabase.from('seller_requests').select('*, user:user_id(*)').eq('status', 'pending');
        if (data) setSellerRequests(data);
      } catch(e) {}
+  };
+
+  const fetchReports = async () => {
+    try {
+      const { data } = await supabase.from('reports').select('*, reporter:reporter_id(username, display_name), post:posts(*)').eq('type', 'post').order('created_at', { ascending: false });
+      if (data) setReports(data);
+    } catch(e) {}
   };
 
   const toggleVerified = async (userId: string, currentStatus: boolean) => {
@@ -61,6 +70,20 @@ export default function Admin() {
       }
   };
 
+  const handleDismissReport = async (reportId: string) => {
+    await supabase.from('reports').delete().eq('id', reportId);
+    setReports(prev => prev.filter(r => r.id !== reportId));
+  };
+
+  const handleDeletePost = async (postId: string, reportId: string) => {
+     if (window.confirm('Delete this post and dismiss the report?')) {
+        await supabase.from('posts').delete().eq('id', postId);
+        // The report might cascade delete if we set up foreign keys, but just in case:
+        await supabase.from('reports').delete().eq('id', reportId);
+        setReports(prev => prev.filter(r => r.id !== reportId));
+     }
+  };
+
   return (
     <div className="w-full min-h-screen">
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border px-4 py-3 flex items-center gap-2">
@@ -84,6 +107,36 @@ export default function Admin() {
                           <button onClick={() => handleSellerRequest(req.id, req.user_id, 'approved')} className="w-10 h-10 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center hover:bg-green-500 hover:text-white transition-colors"><Check size={20}/></button>
                           <button onClick={() => handleSellerRequest(req.id, req.user_id, 'rejected')} className="w-10 h-10 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors"><X size={20}/></button>
                        </div>
+                    </div>
+                 ))}
+              </div>
+           </div>
+        )}
+
+        {reports.length > 0 && (
+           <div className="mb-8">
+              <h2 className="font-bold text-lg mb-4 flex items-center gap-2">Post Reports <span className="bg-red-500 text-white rounded-full px-2 text-xs">{reports.length}</span></h2>
+              <div className="grid gap-3">
+                 {reports.map(report => (
+                    <div key={report.id} className="bg-card border border-border p-4 rounded-xl">
+                       <div className="flex justify-between items-start mb-3">
+                          <div>
+                             <div className="font-bold text-red-500">{report.reason}</div>
+                             <div className="text-xs text-muted-foreground mt-1">Reported by @{report.reporter?.username}</div>
+                          </div>
+                          <div className="flex gap-2">
+                             <button onClick={() => handleDismissReport(report.id)} className="px-3 py-1 bg-muted hover:bg-muted/80 rounded font-medium text-xs transition-colors">Dismiss</button>
+                             <button onClick={() => handleDeletePost(report.target_id, report.id)} className="px-3 py-1 bg-red-500 text-white hover:bg-red-600 rounded font-medium text-xs transition-colors flex items-center gap-1"><Trash2 size={12}/> Delete Post</button>
+                          </div>
+                       </div>
+                       {report.post ? (
+                          <div className="bg-muted/30 p-3 rounded-lg border border-border/50 text-sm">
+                             {report.post.content}
+                             {report.post.image_url && <img src={report.post.image_url} className="mt-2 h-20 object-cover rounded" />}
+                          </div>
+                       ) : (
+                          <div className="text-sm text-muted-foreground italic">Post has been deleted.</div>
+                       )}
                     </div>
                  ))}
               </div>

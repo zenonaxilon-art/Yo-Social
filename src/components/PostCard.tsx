@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAppStore } from '../lib/store';
 import { Link } from 'react-router-dom';
 import { formatRelativeTime } from '../lib/utils';
-import { Heart, MessageCircle, Trash2, Send, Bookmark, BadgeCheck, Repeat } from 'lucide-react';
+import { Heart, MessageCircle, Trash2, Send, Bookmark, BadgeCheck, Repeat, Flag, X, Loader2 } from 'lucide-react';
 
 export default function PostCard({ post, onDelete, onUpdate }: { post: any, onDelete?: (id: string) => void, onUpdate?: () => void }) {
   const { profile } = useAppStore();
@@ -25,6 +25,11 @@ export default function PostCard({ post, onDelete, onUpdate }: { post: any, onDe
   const [commentsCount, setCommentsCount] = useState(0);
   const [newComment, setNewComment] = useState('');
   const [postingComment, setPostingComment] = useState(false);
+
+  // Reporting
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [isReporting, setIsReporting] = useState(false);
 
   useEffect(() => {
     fetchInteractions();
@@ -185,6 +190,30 @@ export default function PostCard({ post, onDelete, onUpdate }: { post: any, onDe
     }
   };
 
+  const handleReport = async () => {
+    if (!profile || !reportReason) return;
+    setIsReporting(true);
+    try {
+      const { error } = await supabase.from('reports').insert({
+        reporter_id: profile.id,
+        target_id: displayPost.id,
+        type: 'post',
+        reason: reportReason
+      });
+      if (!error) {
+        alert('Report submitted successfully.');
+        setShowReportModal(false);
+        setReportReason('');
+      } else {
+        alert('Failed to submit report.');
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsReporting(false);
+    }
+  };
+
   // Skip rendering if original post is missing and it's a repost (means deleted)
   if (post.original_post_id && !post.original_post) {
       return (
@@ -226,11 +255,18 @@ export default function PostCard({ post, onDelete, onUpdate }: { post: any, onDe
                <span className="text-muted-foreground px-1">·</span>
                <span className="text-muted-foreground hover:underline text-sm">{formatRelativeTime(post.created_at)}</span>
              </div>
-             {profile?.id === post.user_id && (
-               <button onClick={handleDelete} className="text-muted-foreground hover:text-red-500 transition-colors p-1 rounded-full hover:bg-red-500/10" aria-label="Delete post">
-                 <Trash2 size={16} />
-               </button>
-             )}
+             <div className="flex gap-2">
+               {profile?.id !== post.user_id && (
+                 <button onClick={() => setShowReportModal(true)} className="text-muted-foreground hover:text-red-500 transition-colors p-1 rounded-full hover:bg-red-500/10" aria-label="Report post">
+                   <Flag size={16} />
+                 </button>
+               )}
+               {profile?.id === post.user_id && (
+                 <button onClick={handleDelete} className="text-muted-foreground hover:text-red-500 transition-colors p-1 rounded-full hover:bg-red-500/10" aria-label="Delete post">
+                   <Trash2 size={16} />
+                 </button>
+               )}
+             </div>
           </div>
           
           {displayPost.content && (
@@ -304,6 +340,41 @@ export default function PostCard({ post, onDelete, onUpdate }: { post: any, onDe
                 <Send size={18} />
               </button>
             </form>
+         </div>
+      )}
+
+      {/* Report Modal */}
+      {showReportModal && (
+         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-card w-full max-w-[400px] border border-border rounded-xl shadow-xl flex flex-col p-5" onClick={(e) => e.stopPropagation()}>
+               <div className="flex justify-between items-center mb-4">
+                 <h2 className="text-xl font-bold flex items-center gap-2"><Flag size={20} className="text-red-500"/> Report Post</h2>
+                 <button onClick={() => setShowReportModal(false)} className="hover:bg-muted p-1 rounded-full"><X size={20}/></button>
+               </div>
+               
+               <p className="text-sm text-muted-foreground mb-4">Please select a reason for reporting this post. This will be reviewed by our admins.</p>
+               
+               <div className="space-y-2 mb-6">
+                  {['Spam or misleading', 'Harassment or hate speech', 'Inappropriate content', 'Violence or gore'].map(reason => (
+                     <button 
+                       key={reason}
+                       onClick={() => setReportReason(reason)}
+                       className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${reportReason === reason ? 'border-primary bg-primary/10 font-medium' : 'border-border hover:bg-muted'}`}
+                     >
+                        {reason}
+                     </button>
+                  ))}
+               </div>
+
+               <button 
+                 onClick={handleReport}
+                 disabled={!reportReason || isReporting}
+                 className="w-full bg-red-500 text-white font-bold py-2.5 rounded-full hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+               >
+                 {isReporting && <Loader2 size={16} className="animate-spin" />}
+                 {isReporting ? 'Submitting...' : 'Submit Report'}
+               </button>
+            </div>
          </div>
       )}
     </article>

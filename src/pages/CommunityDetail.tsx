@@ -74,14 +74,21 @@ export default function CommunityDetail() {
 
   const fetchPosts = async () => {
     try {
-      const { data } = await supabase.from('posts').select(`
+      const { data, error } = await supabase.from('posts').select(`
         *,
         users:user_id ( username, display_name, profile_picture_url, is_verified, role ),
         original_post:original_post_id ( *, users:user_id ( username, display_name, profile_picture_url, is_verified, role ) )
       `).eq('community_id', id).order('created_at', { ascending: false });
-      if (data) setPosts(data);
-    } catch(err) {
+      
+      if (error) {
+         console.error('Fetch posts error:', error);
+         alert(`Failed to load community posts: ${error.message}`);
+      } else if (data) {
+         setPosts(data);
+      }
+    } catch(err: any) {
       console.log('Failed fetching community posts', err);
+      alert(`Error loading posts: ${err.message}`);
     }
   };
 
@@ -196,12 +203,17 @@ export default function CommunityDetail() {
         if (!uploadError) {
           const { data } = supabase.storage.from('post_images').getPublicUrl(fileName);
           image_url = data.publicUrl;
+        } else {
+             console.error("Image upload error:", uploadError);
+             alert("Image upload failed.");
+             setPosting(false);
+             return;
         }
       }
 
-      const { error } = await supabase.from('posts').insert({
+      const { error, data: d1 } = await supabase.from('posts').insert({
         user_id: profile.id,
-        community_id: id, // Linking to community
+        community_id: id,
         content: content.trim(),
         image_url
       });
@@ -212,11 +224,14 @@ export default function CommunityDetail() {
         fetchPosts();
         
         // Gamification
-        const { useAppStore } = await import('../lib/store');
         useAppStore.getState().gainXp(15);
+      } else {
+         console.error("Failed to post:", error);
+         alert("Failed to create post. Please check that you've run the 'community_id' column SQL update.");
       }
     } catch (e) {
       console.error(e);
+      alert("An unexpected error occurred.");
     } finally {
       setPosting(false);
     }

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Search, Bell, ShoppingBag, User, Shield, Moon, Sun, MessageCircle } from 'lucide-react';
+import { Home, Search, Bell, ShoppingBag, User, Shield, Moon, Sun, MessageCircle, Mail } from 'lucide-react';
 import { useAppStore } from '../lib/store';
 import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
@@ -12,11 +12,12 @@ export default function Sidebar() {
     { name: 'Home', path: '/', icon: Home },
     { name: 'Explore', path: '/explore', icon: Search },
     { name: 'Notifications', path: '/notifications', icon: Bell },
+    { name: 'Messages', path: '/messages', icon: Mail },
     { name: 'Marketplace', path: '/marketplace', icon: ShoppingBag },
     { name: 'Profile', path: `/profile/${profile?.username}`, icon: User },
   ];
 
-  if (profile?.is_admin) {
+  if (profile?.is_admin || profile?.role === 'admin') {
     navItems.push({ name: 'Admin', path: '/admin', icon: Shield });
   }
 

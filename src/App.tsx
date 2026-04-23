@@ -8,6 +8,7 @@ import Profile from './pages/Profile';
 import Explore from './pages/Explore';
 import Notifications from './pages/Notifications';
 import Marketplace from './pages/Marketplace';
+import Inbox from './pages/Inbox';
 import Admin from './pages/Admin';
 import Sidebar from './components/Sidebar';
 import RightPanel from './components/RightPanel';
@@ -79,6 +80,8 @@ export default function App() {
           <Route index element={<Home />} />
           <Route path="explore" element={<Explore />} />
           <Route path="notifications" element={<Notifications />} />
+          <Route path="messages" element={<Inbox />} />
+          <Route path="messages/:userId" element={<Inbox />} />
           <Route path="marketplace" element={<Marketplace />} />
           <Route path="profile/:username" element={<Profile />} />
           <Route path="admin" element={<Admin />} />

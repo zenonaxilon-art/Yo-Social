@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Search, Bell, ShoppingBag, User } from 'lucide-react';
+import { Home, Search, Bell, Mail, User } from 'lucide-react';
 import { useAppStore } from '../lib/store';
 import { cn } from '../lib/utils';
 
@@ -11,7 +11,7 @@ export default function MobileNav() {
     { name: 'Home', path: '/', icon: Home },
     { name: 'Explore', path: '/explore', icon: Search },
     { name: 'Notifications', path: '/notifications', icon: Bell },
-    { name: 'Marketplace', path: '/marketplace', icon: ShoppingBag },
+    { name: 'Messages', path: '/messages', icon: Mail },
     { name: 'Profile', path: `/profile/${profile?.username}`, icon: User },
   ];
 

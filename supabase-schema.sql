@@ -189,8 +189,8 @@ create policy "Users can delete own marketplace items." on public.marketplace fo
 -- Then apply RLS on storage via UI or SQL.
 -- Example SQL to create buckets and policies (Requires SUPERUSER, which you have in SQL Editor):
 
-insert into storage.buckets (id, name, public) values ('avatars', 'avatars', true);
-insert into storage.buckets (id, name, public) values ('post_images', 'post_images', true);
+insert into storage.buckets (id, name, public) values ('avatars', 'avatars', true) on conflict (id) do nothing;
+insert into storage.buckets (id, name, public) values ('post_images', 'post_images', true) on conflict (id) do nothing;
 
 create policy "Avatar images are publicly accessible." on storage.objects for select using (bucket_id = 'avatars');
 create policy "Anyone can upload an avatar." on storage.objects for insert with check (bucket_id = 'avatars' and auth.role() = 'authenticated');

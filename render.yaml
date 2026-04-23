@@ -5,7 +5,7 @@ services:
     buildCommand: npm install && npm run build
     staticPublishPath: dist
     envVars:
-      - key: https://rtshrshtfmfowollahpj.supabase.co
+      - key: https://jtwargizrhddtambrgzl.supabase.co
         sync: false
-      - key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0c2hyc2h0Zm1mb3dvbGxhaHBqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MDgyNjQsImV4cCI6MjA5MjQ4NDI2NH0.WotwLCtoTPlJs-tcUs2Lki0OpyneUk1-t4RjH6syyog
+      - key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp0d2FyZ2l6cmhkZHRhbWJyZ3psIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MTMxMTEsImV4cCI6MjA5MjQ4OTExMX0.GeRC0EwoZfdAinAVTZ2SZaW7lHAYlWNsPgzPM0rumpM
         sync: false

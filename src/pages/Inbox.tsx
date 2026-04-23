@@ -96,6 +96,10 @@ export default function Inbox() {
        scrollToBottom();
        // Mark as read
        await supabase.from('messages').update({ seen: true }).eq('sender_id', uid).eq('receiver_id', profile.id).eq('seen', false);
+       
+       // Re-update global store msg count since we read some
+       const { count } = await supabase.from('messages').select('*', { count: 'exact', head: true }).eq('receiver_id', profile.id).eq('seen', false);
+       useAppStore.getState().setUnreadMessages(count || 0);
     }
   };
 

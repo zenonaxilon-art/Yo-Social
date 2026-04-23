@@ -3,15 +3,22 @@ import { supabase } from '../lib/supabase';
 import { useAppStore } from '../lib/store';
 import { Link } from 'react-router-dom';
 import { formatRelativeTime } from '../lib/utils';
-import { Heart, MessageCircle, Trash2, Send, Bookmark, BadgeCheck } from 'lucide-react';
+import { Heart, MessageCircle, Trash2, Send, Bookmark, BadgeCheck, Repeat } from 'lucide-react';
 
 export default function PostCard({ post, onDelete, onUpdate }: { post: any, onDelete?: (id: string) => void, onUpdate?: () => void }) {
   const { profile } = useAppStore();
-  const user = post.users || {};
+  
+  // Resolve whether this is a repost or not
+  const isRepost = !!post.original_post_id && !!post.original_post;
+  const displayPost = isRepost ? post.original_post : post;
+  const user = displayPost.users || {};
   
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
   const [bookmarked, setBookmarked] = useState(false);
+  
+  const [reposted, setReposted] = useState(false);
+  const [repostsCount, setRepostsCount] = useState(0);
   
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<any[]>([]);
@@ -21,25 +28,31 @@ export default function PostCard({ post, onDelete, onUpdate }: { post: any, onDe
 
   useEffect(() => {
     fetchInteractions();
-  }, [post.id, profile?.id]);
+  }, [displayPost.id, profile?.id]);
 
   const fetchInteractions = async () => {
     // Fetch likes count
-    const { count: lCount } = await supabase.from('likes').select('*', { count: 'exact', head: true }).eq('post_id', post.id);
+    const { count: lCount } = await supabase.from('likes').select('*', { count: 'exact', head: true }).eq('post_id', displayPost.id);
     setLikesCount(lCount || 0);
 
     // Fetch comments count
-    const { count: cCount } = await supabase.from('comments').select('*', { count: 'exact', head: true }).eq('post_id', post.id);
+    const { count: cCount } = await supabase.from('comments').select('*', { count: 'exact', head: true }).eq('post_id', displayPost.id);
     setCommentsCount(cCount || 0);
+    
+    // Fetch reposts count
+    const { count: rCount } = await supabase.from('posts').select('*', { count: 'exact', head: true }).eq('original_post_id', displayPost.id);
+    setRepostsCount(rCount || 0);
 
-    // Fetch if user liked
+    // Fetch if user liked, bookmarked, or reposted
     if (profile) {
-      const { data } = await supabase.from('likes').select('*').eq('post_id', post.id).eq('user_id', profile.id).single();
+      const { data } = await supabase.from('likes').select('*').eq('post_id', displayPost.id).eq('user_id', profile.id).single();
       setLiked(!!data);
       
-      // We wrap the bookmark check in a simple try catch so it doesn't crash if the new schema table isn't applied yet
+      const { data: repData } = await supabase.from('posts').select('id').eq('original_post_id', displayPost.id).eq('user_id', profile.id).maybeSingle();
+      setReposted(!!repData);
+      
       try {
-         const { data: bData } = await supabase.from('bookmarks').select('*').eq('post_id', post.id).eq('user_id', profile.id).single();
+         const { data: bData } = await supabase.from('bookmarks').select('*').eq('post_id', displayPost.id).eq('user_id', profile.id).single();
          setBookmarked(!!bData);
       } catch(e) {}
     }
@@ -48,7 +61,7 @@ export default function PostCard({ post, onDelete, onUpdate }: { post: any, onDe
   const fetchComments = async () => {
     const { data } = await supabase.from('comments')
       .select('*, users:user_id(username, display_name, profile_picture_url, is_verified, role)')
-      .eq('post_id', post.id)
+      .eq('post_id', displayPost.id)
       .order('created_at', { ascending: true });
     if (data) setComments(data);
   };
@@ -63,40 +76,74 @@ export default function PostCard({ post, onDelete, onUpdate }: { post: any, onDe
     if (!profile) return;
     
     if (liked) {
-      await supabase.from('likes').delete().eq('post_id', post.id).eq('user_id', profile.id);
+      await supabase.from('likes').delete().eq('post_id', displayPost.id).eq('user_id', profile.id);
       setLikesCount(prev => prev - 1);
       setLiked(false);
     } else {
-      await supabase.from('likes').insert({ post_id: post.id, user_id: profile.id });
+      await supabase.from('likes').insert({ post_id: displayPost.id, user_id: profile.id });
       setLikesCount(prev => prev + 1);
       setLiked(true);
       // Create notification
-      if (post.user_id !== profile.id) {
+      if (displayPost.user_id !== profile.id) {
         supabase.from('notifications').insert({
-           user_id: post.user_id,
+           user_id: displayPost.user_id,
            actor_id: profile.id,
            type: 'like',
-           post_id: post.id
+           post_id: displayPost.id
         }).then();
       }
+    }
+  };
+  
+  const handleRepost = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!profile) return;
+    
+    if (reposted) {
+       // Delete the repost
+       await supabase.from('posts').delete().eq('original_post_id', displayPost.id).eq('user_id', profile.id);
+       setReposted(false);
+       setRepostsCount(prev => prev - 1);
+    } else {
+       // Insert a repost
+       if (window.confirm("Repost this to your feed?")) {
+           try {
+               await supabase.from('posts').insert({
+                   user_id: profile.id,
+                   content: '',
+                   original_post_id: displayPost.id
+               });
+               setReposted(true);
+               setRepostsCount(prev => prev + 1);
+               // Send notification to original op
+               if (displayPost.user_id !== profile.id) {
+                  supabase.from('notifications').insert({
+                     user_id: displayPost.user_id,
+                     actor_id: profile.id,
+                     type: 'repost',
+                     post_id: displayPost.id
+                  }).then();
+               }
+           } catch(e) {
+               console.error("Failed to repost", e);
+               alert("Please make sure you have applied the latest SQL schema updates to support Reposts.");
+           }
+       }
     }
   };
 
   const handleBookmark = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!profile) return;
-    
     try {
       if (bookmarked) {
-        await supabase.from('bookmarks').delete().eq('post_id', post.id).eq('user_id', profile.id);
+        await supabase.from('bookmarks').delete().eq('post_id', displayPost.id).eq('user_id', profile.id);
         setBookmarked(false);
       } else {
-        await supabase.from('bookmarks').insert({ post_id: post.id, user_id: profile.id });
+        await supabase.from('bookmarks').insert({ post_id: displayPost.id, user_id: profile.id });
         setBookmarked(true);
       }
-    } catch(err) {
-       console.log('Bookmarks table likely not created yet', err);
-    }
+    } catch(err) {}
   };
 
   const handleComment = async (e: React.FormEvent) => {
@@ -106,7 +153,7 @@ export default function PostCard({ post, onDelete, onUpdate }: { post: any, onDe
 
     try {
       await supabase.from('comments').insert({
-        post_id: post.id,
+        post_id: displayPost.id,
         user_id: profile.id,
         content: newComment.trim()
       });
@@ -115,12 +162,12 @@ export default function PostCard({ post, onDelete, onUpdate }: { post: any, onDe
       fetchComments();
       
       // Create notification
-      if (post.user_id !== profile.id) {
+      if (displayPost.user_id !== profile.id) {
         supabase.from('notifications').insert({
-           user_id: post.user_id,
+           user_id: displayPost.user_id,
            actor_id: profile.id,
            type: 'comment',
-           post_id: post.id
+           post_id: displayPost.id
         }).then();
       }
     } catch (e) {
@@ -133,15 +180,35 @@ export default function PostCard({ post, onDelete, onUpdate }: { post: any, onDe
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (window.confirm('Are you sure you want to delete this post?')) {
-       await supabase.from('posts').delete().eq('id', post.id);
+       await supabase.from('posts').delete().eq('id', post.id); // Deletes the wrapper post (either the repost or the original)
        if (onDelete) onDelete(post.id);
     }
   };
+
+  // Skip rendering if original post is missing and it's a repost (means deleted)
+  if (post.original_post_id && !post.original_post) {
+      return (
+         <div className="bg-card border border-border rounded-2xl p-4 text-muted-foreground text-[15px] italic">
+            This repost is unavailable because the original post was deleted.
+            {profile?.id === post.user_id && (
+               <button onClick={handleDelete} className="ml-3 text-red-500 hover:underline not-italic">Remove</button>
+            )}
+         </div>
+      );
+  }
 
   const showGoldBadge = user.role === 'creator' || user.role === 'admin';
 
   return (
     <article className="bg-card border border-border rounded-2xl p-5 hover:border-muted-foreground/30 transition-colors">
+      
+      {isRepost && (
+         <div className="flex items-center gap-2 text-muted-foreground text-[13px] font-bold mb-3 sm:ml-12">
+            <Repeat size={14} /> 
+            <Link to={`/profile/${post.users?.username}`} className="hover:underline">{post.users?.display_name} Reposted</Link>
+         </div>
+      )}
+
       <div className="flex gap-3">
         <Link to={`/profile/${user.username}`} className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white overflow-hidden shrink-0 flex items-center justify-center font-bold">
           {user.profile_picture_url ? <img src={user.profile_picture_url} className="w-full h-full object-cover" alt="" /> : user.display_name?.charAt(0)}
@@ -160,29 +227,36 @@ export default function PostCard({ post, onDelete, onUpdate }: { post: any, onDe
                <span className="text-muted-foreground hover:underline text-sm">{formatRelativeTime(post.created_at)}</span>
              </div>
              {profile?.id === post.user_id && (
-               <button onClick={handleDelete} className="text-muted-foreground hover:text-red-500 transition-colors p-1 rounded-full hover:bg-red-500/10">
+               <button onClick={handleDelete} className="text-muted-foreground hover:text-red-500 transition-colors p-1 rounded-full hover:bg-red-500/10" aria-label="Delete post">
                  <Trash2 size={16} />
                </button>
              )}
           </div>
           
-          <div className="mt-1 text-foreground leading-relaxed whitespace-pre-wrap break-words text-[15px]">
-            {post.content.split(/(#[a-z\d-]+)/ig).map((part: string, i: number) => 
-               /^#[a-z\d-]+/i.test(part) ? <span key={i} className="text-primary hover:underline cursor-pointer">{part}</span> : part
-            )}
-          </div>
-          {post.image_url && (
+          {displayPost.content && (
+            <div className="mt-1 text-foreground leading-relaxed whitespace-pre-wrap break-words text-[15px]">
+              {displayPost.content.split(/(#[a-z\d-]+)/ig).map((part: string, i: number) => 
+                 /^#[a-z\d-]+/i.test(part) ? <span key={i} className="text-primary hover:underline cursor-pointer">{part}</span> : part
+              )}
+            </div>
+          )}
+          
+          {displayPost.image_url && (
             <div className="mt-3 rounded-xl bg-muted overflow-hidden border border-border relative">
-              <img src={post.image_url} alt="Post media" className="w-full h-auto max-h-[500px] object-cover" />
+              <img src={displayPost.image_url} alt="Post media" className="w-full h-auto max-h-[500px] object-cover" />
             </div>
           )}
           
           <div className="mt-4 flex gap-6 text-muted-foreground text-[14px]">
-            <button onClick={toggleComments} className="flex items-center gap-2 hover:text-accent cursor-pointer transition-colors group">
+            <button onClick={toggleComments} className="flex flex-1 items-center gap-2 hover:text-accent cursor-pointer transition-colors group">
               <div className="p-1.5 rounded-full group-hover:bg-accent/10 transition-colors"><MessageCircle size={18} /></div> 
               {commentsCount > 0 && <span>{commentsCount}</span>}
             </button>
-            <button onClick={handleLike} className={`flex items-center gap-2 cursor-pointer transition-colors group ${liked ? 'text-red-500' : 'hover:text-red-500'}`}>
+            <button onClick={handleRepost} className={`flex flex-1 items-center gap-2 hover:text-green-500 cursor-pointer transition-colors group ${reposted ? 'text-green-500' : ''}`}>
+              <div className="p-1.5 rounded-full group-hover:bg-green-500/10 transition-colors"><Repeat size={18} /></div> 
+              {repostsCount > 0 && <span>{repostsCount}</span>}
+            </button>
+            <button onClick={handleLike} className={`flex flex-1 items-center gap-2 cursor-pointer transition-colors group ${liked ? 'text-red-500' : 'hover:text-red-500'}`}>
               <div className="p-1.5 rounded-full group-hover:bg-red-500/10 transition-colors">
                 <Heart size={18} className={liked ? 'fill-current' : ''} />
               </div> 
@@ -195,6 +269,7 @@ export default function PostCard({ post, onDelete, onUpdate }: { post: any, onDe
         </div>
       </div>
       
+      {/* Comments section hidden to save space but handled exactly as before just replacing references to displayPost.id */}
       {showComments && (
          <div className="mt-4 pt-4 border-t border-border">
             {comments.map(c => {

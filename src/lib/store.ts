@@ -7,11 +7,15 @@ interface AppState {
   profile: any | null;
   sessionChecked: boolean;
   theme: 'light' | 'dark';
+  unreadNotifications: number;
+  unreadMessages: number;
   setUser: (user: User | null) => void;
   setProfile: (profile: any | null) => void;
   setSessionChecked: (checked: boolean) => void;
   toggleTheme: () => void;
   fetchProfile: (userId: string) => Promise<void>;
+  setUnreadNotifications: (count: number | ((prev: number) => number)) => void;
+  setUnreadMessages: (count: number | ((prev: number) => number)) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -19,6 +23,8 @@ export const useAppStore = create<AppState>((set) => ({
   profile: null,
   sessionChecked: false,
   theme: 'dark', // Elegant Dark theme is default
+  unreadNotifications: 0,
+  unreadMessages: 0,
   setUser: (user) => set({ user }),
   setProfile: (profile) => set({ profile }),
   setSessionChecked: (checked) => set({ sessionChecked: checked }),
@@ -40,5 +46,11 @@ export const useAppStore = create<AppState>((set) => ({
     if (!error && data) {
       set({ profile: data });
     }
-  }
+  },
+  setUnreadNotifications: (count) => set((state) => ({ 
+      unreadNotifications: typeof count === 'function' ? count(state.unreadNotifications) : count 
+  })),
+  setUnreadMessages: (count) => set((state) => ({ 
+      unreadMessages: typeof count === 'function' ? count(state.unreadMessages) : count 
+  })),
 }));

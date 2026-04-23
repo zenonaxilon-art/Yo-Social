@@ -29,6 +29,36 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function Layout() {
+  const { user, setUnreadNotifications, setUnreadMessages } = useAppStore();
+
+  useEffect(() => {
+    if (!user) return;
+
+    // Initial fetch
+    const fetchCounts = async () => {
+      const { count: notifCount } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('is_read', false);
+      const { count: msgCount } = await supabase.from('messages').select('*', { count: 'exact', head: true }).eq('receiver_id', user.id).eq('seen', false);
+      
+      setUnreadNotifications(notifCount || 0);
+      setUnreadMessages(msgCount || 0);
+    };
+    fetchCounts();
+
+    // Subscribe to realtime channels
+    const notifChannel = supabase.channel('notifCount')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, fetchCounts)
+      .subscribe();
+
+    const msgChannel = supabase.channel('msgCount')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` }, fetchCounts)
+      .subscribe();
+
+    return () => {
+      notifChannel.unsubscribe();
+      msgChannel.unsubscribe();
+    };
+  }, [user]);
+
   return (
     <div className="max-w-[1280px] mx-auto flex sm:min-h-screen justify-center">
       <Sidebar />

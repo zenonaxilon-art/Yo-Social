@@ -29,8 +29,13 @@ export default function Admin() {
   };
 
   const toggleVerified = async (userId: string, currentStatus: boolean) => {
-    await supabase.from('users').update({ is_verified: !currentStatus }).eq('id', userId);
-    setUsers(users.map(u => u.id === userId ? { ...u, is_verified: !currentStatus } : u));
+    const { error } = await supabase.from('users').update({ is_verified: !currentStatus }).eq('id', userId);
+    if (error) {
+       console.error("Error updating user:", error);
+       alert("Failed to assign badge. Please make sure you have run the Admin RLS policy in your Supabase SQL Editor!");
+    } else {
+       setUsers(users.map(u => u.id === userId ? { ...u, is_verified: !currentStatus } : u));
+    }
   };
 
   return (

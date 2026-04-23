@@ -5,20 +5,20 @@ import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
 
 export default function Sidebar() {
-  const { profile, theme, toggleTheme } = useAppStore();
+  const { profile, theme, toggleTheme, unreadNotifications, unreadMessages } = useAppStore();
   const location = useLocation();
 
   const navItems = [
     { name: 'Home', path: '/', icon: Home },
     { name: 'Explore', path: '/explore', icon: Search },
-    { name: 'Notifications', path: '/notifications', icon: Bell },
-    { name: 'Messages', path: '/messages', icon: Mail },
+    { name: 'Notifications', path: '/notifications', icon: Bell, unread: unreadNotifications > 0 },
+    { name: 'Messages', path: '/messages', icon: Mail, unread: unreadMessages > 0 },
     { name: 'Marketplace', path: '/marketplace', icon: ShoppingBag },
     { name: 'Profile', path: `/profile/${profile?.username}`, icon: User },
   ];
 
   if (profile?.is_admin || profile?.role === 'admin') {
-    navItems.push({ name: 'Admin', path: '/admin', icon: Shield });
+    navItems.push({ name: 'Admin', path: '/admin', icon: Shield, unread: false });
   }
 
   return (
@@ -36,8 +36,8 @@ export default function Sidebar() {
               <div className="flex items-center gap-4 px-4 py-3 w-full rounded-xl">
                 <div className="relative">
                   <Icon size={26} strokeWidth={isActive ? 2.5 : 2} className="transition-transform duration-200" />
-                  {item.name === 'Notifications' && (
-                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-accent rounded-full" />
+                  {item.unread && (
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-primary border-2 border-background rounded-full" />
                   )}
                 </div>
                 <span className={cn("hidden xl:block pr-4", isActive ? "font-bold" : "font-medium")}>

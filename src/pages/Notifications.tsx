@@ -32,7 +32,10 @@ export default function Notifications() {
     if (data) {
       setNotifications(data);
       // Mark as read
-      supabase.from('notifications').update({ is_read: true }).eq('user_id', user!.id).is('is_read', false).then();
+      await supabase.from('notifications').update({ is_read: true }).eq('user_id', user!.id).is('is_read', false);
+      
+      // Zero out the notifications counter for global indicators locally
+      useAppStore.getState().setUnreadNotifications(0);
     }
     setLoading(false);
   };

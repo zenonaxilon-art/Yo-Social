@@ -46,8 +46,23 @@ export default function Profile() {
          website_url: user.website_url || ''
       });
       
-      const { data: userPosts } = await supabase.from('posts').select(`*, users:user_id ( username, display_name, profile_picture_url, is_verified, role )`).eq('user_id', user.id).order('created_at', { ascending: false });
-      if (userPosts) setPosts(userPosts);
+      const fetchProfilePosts = async (uid: string) => {
+        let query = supabase.from('posts').select(`
+          *, 
+          users:user_id ( username, display_name, profile_picture_url, is_verified, role ),
+          original_post:original_post_id ( *, users:user_id ( username, display_name, profile_picture_url, is_verified, role ) )
+        `).eq('user_id', uid).order('created_at', { ascending: false });
+        
+        try {
+           const { data: userPosts } = await query;
+           if (userPosts) setPosts(userPosts);
+        } catch(err) {
+           const { data: userPostsFb } = await supabase.from('posts').select(`*, users:user_id ( username, display_name, profile_picture_url, is_verified, role )`).eq('user_id', uid).order('created_at', { ascending: false });
+           if (userPostsFb) setPosts(userPostsFb);
+        }
+      };
+      
+      fetchProfilePosts(user.id);
 
       const { count: followers } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', user.id);
       const { count: following } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', user.id);
@@ -77,6 +92,13 @@ export default function Profile() {
     } else {
       await supabase.from('follows').insert({ follower_id: currentUser.id, following_id: profile.id });
       setFollowStats(prev => ({ ...prev, followers: prev.followers + 1 }));
+      
+      // Send notification
+      supabase.from('notifications').insert({
+         user_id: profile.id,
+         actor_id: currentUser.id,
+         type: 'follow'
+      }).then();
     }
     setIsFollowing(!isFollowing);
   };

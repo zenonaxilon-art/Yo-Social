@@ -27,8 +27,12 @@ create table public.posts (
   user_id uuid references public.users on delete cascade not null,
   content text not null,
   image_url text,
+  original_post_id uuid references public.posts(id) on delete cascade,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+-- Note: to retroactively add original_post_id to an existing table, run:
+-- alter table public.posts add column original_post_id uuid references public.posts(id) on delete cascade;
 
 -- Likes Table
 create table public.likes (
@@ -119,10 +123,15 @@ create table public.marketplace (
 
 -- Set up Row Level Security (RLS)
 
--- Users: Read all, update self
+-- Users: Read all, update self, Admins can update all. 
 alter table public.users enable row level security;
 create policy "Users are viewable by everyone." on public.users for select using (true);
 create policy "Users can update their own profile." on public.users for update using (auth.uid() = id);
+
+-- Admin policy: Admins can update any user profile (using an existing check to prevent recursion safely)
+create policy "Admins can update all profiles." on public.users for update using (
+  (select is_admin from public.users where id = auth.uid()) = true
+);
 
 -- IMPORTANT Admin Setup:
 -- To set the pre-created admin account, have the user sign up with Username: Edredm3 and Password: Longtamad1.

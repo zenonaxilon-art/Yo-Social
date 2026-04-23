@@ -54,7 +54,8 @@ export default function Home() {
       .from('posts')
       .select(`
         *,
-        users:user_id ( username, display_name, profile_picture_url, is_verified, role )
+        users:user_id ( username, display_name, profile_picture_url, is_verified, role ),
+        original_post:original_post_id ( *, users:user_id ( username, display_name, profile_picture_url, is_verified, role ) )
       `)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -71,8 +72,17 @@ export default function Home() {
       return;
     }
 
-    const { data } = await query;
-    if (data) setPosts(data);
+    // Wrap in try catch incase they didn't run the SQL schema yet
+    try {
+       const { data } = await query;
+       if (data) setPosts(data);
+    } catch(err) {
+       console.log('Failed fetching posts because of missing schema elements', err);
+       // Fallback without original_post
+       query = supabase.from('posts').select(`*, users:user_id ( username, display_name, profile_picture_url, is_verified, role )`).order('created_at', { ascending: false }).limit(50);
+       const { data } = await query;
+       if (data) setPosts(data);
+    }
     setLoading(false);
   };
 

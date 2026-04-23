@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../lib/store';
-import { ArrowLeft, Users, Shield, MessageSquareX, Sparkles, Image as ImageIcon, X } from 'lucide-react';
+import { ArrowLeft, Users, Shield, MessageSquareX, Sparkles, Image as ImageIcon, X, Settings, Camera, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import PostCard from '../components/PostCard';
 import { PostSkeleton, EmptyState } from '../components/UIStates';
@@ -24,6 +24,15 @@ export default function CommunityDetail() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [posting, setPosting] = useState(false);
 
+  // Edit Community
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', description: '', rules: '' });
+  const [iconFile, setIconFile] = useState<File | null>(null);
+  const [iconPreview, setIconPreview] = useState<string | null>(null);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
   useEffect(() => {
     fetchCommunity();
   }, [id, profile]);
@@ -34,7 +43,14 @@ export default function CommunityDetail() {
 
     // Fetch community details
     const { data: commData } = await supabase.from('communities').select('*').eq('id', id).single();
-    if (commData) setCommunity(commData);
+    if (commData) {
+      setCommunity(commData);
+      setEditForm({
+         name: commData.name || '',
+         description: commData.description || '',
+         rules: commData.rules || ''
+      });
+    }
 
     // Fetch members and my role
     const { data: memberData } = await supabase.from('community_members').select('*, users(*)').eq('community_id', id);
@@ -113,6 +129,60 @@ export default function CommunityDetail() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const handleSaveCommunity = async () => {
+      if (!profile || !community) return;
+      setIsSaving(true);
+      
+      try {
+        let finalIconUrl = community.icon_url;
+        let finalBannerUrl = community.banner_url;
+
+        if (iconFile) {
+          const fileExt = iconFile.name.split('.').pop();
+          const fileName = `comm-${id}-icon-${Date.now()}.${fileExt}`;
+          const { data } = await supabase.storage.from('avatars').upload(fileName, iconFile, { upsert: true });
+          if (data) {
+             const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
+             finalIconUrl = publicUrl;
+          }
+        }
+
+        if (bannerFile) {
+          const fileExt = bannerFile.name.split('.').pop();
+          const fileName = `comm-${id}-banner-${Date.now()}.${fileExt}`;
+          const { data } = await supabase.storage.from('avatars').upload(fileName, bannerFile, { upsert: true });
+          if (data) {
+             const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
+             finalBannerUrl = publicUrl;
+          }
+        }
+
+        const updates = {
+          name: editForm.name.trim() || community.name,
+          description: editForm.description.trim(),
+          rules: editForm.rules.trim(),
+          icon_url: finalIconUrl,
+          banner_url: finalBannerUrl
+        };
+
+        const { error } = await supabase.from('communities').update(updates).eq('id', id);
+        
+        if (!error) {
+           setCommunity({ ...community, ...updates });
+           setIsEditing(false);
+           setIconFile(null);
+           setBannerFile(null);
+        } else {
+           console.error('Update error', error);
+           alert("Failed to update: " + error.message);
+        }
+      } catch (err) {
+         console.error('Failed to update community', err);
+      } finally {
+         setIsSaving(false);
+      }
+  };
+
   const handlePost = async () => {
     if ((!content.trim() && !imageFile) || !profile || !id) return;
     setPosting(true);
@@ -157,6 +227,22 @@ export default function CommunityDetail() {
   };
 
 
+  const handleIconChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+       const file = e.target.files[0];
+       setIconFile(file);
+       setIconPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleBannerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+       const file = e.target.files[0];
+       setBannerFile(file);
+       setBannerPreview(URL.createObjectURL(file));
+    }
+  };
+
   if (loading && !community) {
     return <div className="p-4 flex justify-center"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div></div>;
   }
@@ -167,13 +253,20 @@ export default function CommunityDetail() {
 
   return (
     <div className="w-full pb-20 relative">
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border flex items-center px-4 py-1.5 h-[53px]">
-        <Link to="/communities" className="w-9 h-9 rounded-full hover:bg-muted transition-colors flex items-center justify-center mr-6">
-          <ArrowLeft size={20} />
-        </Link>
-        <h1 className="text-xl font-bold leading-tight truncate">
-          {community.name}
-        </h1>
+      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border flex items-center justify-between px-4 py-1.5 h-[53px]">
+        <div className="flex items-center">
+          <Link to="/communities" className="w-9 h-9 rounded-full hover:bg-muted transition-colors flex items-center justify-center mr-4">
+            <ArrowLeft size={20} />
+          </Link>
+          <h1 className="text-xl font-bold leading-tight truncate">
+            {community.name}
+          </h1>
+        </div>
+        {memberRole === 'admin' && (
+           <button onClick={() => setIsEditing(true)} className="w-9 h-9 rounded-full hover:bg-muted transition-colors flex items-center justify-center">
+             <Settings size={20} className="text-muted-foreground" />
+           </button>
+        )}
       </div>
 
       {/* Header Banner */}
@@ -314,6 +407,67 @@ export default function CommunityDetail() {
             </div>
          )}
       </div>
+
+      {/* Edit Modal */}
+      {isEditing && (
+         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-card w-full max-w-[500px] max-h-[90vh] overflow-y-auto border border-border rounded-2xl shadow-xl p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold">Edit Community Settings</h2>
+                <button onClick={() => { setIsEditing(false); setIconFile(null); setBannerFile(null); }} className="hover:bg-muted p-1 rounded-full"><X size={20}/></button>
+              </div>
+
+              <div className="space-y-5">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground block mb-2">Banner Image</label>
+                  <label className="h-32 w-full border-2 border-dashed border-border rounded-xl flex items-center justify-center cursor-pointer relative overflow-hidden bg-muted/30 hover:bg-muted/50 transition-colors">
+                     <img src={bannerPreview || community.banner_url} className={cn("absolute inset-0 w-full h-full object-cover", !(bannerPreview || community.banner_url) && "hidden")} />
+                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                        <Camera className="text-white" size={32} />
+                     </div>
+                     {!bannerPreview && !community.banner_url && <Camera className="text-muted-foreground" size={32} />}
+                     <input type="file" accept="image/*" className="hidden" onChange={handleBannerChange}/>
+                  </label>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground block mb-2">Icon Image</label>
+                  <label className="w-24 h-24 border-2 border-dashed border-border rounded-xl flex items-center justify-center cursor-pointer relative overflow-hidden bg-muted/30 hover:bg-muted/50 transition-colors">
+                     <img src={iconPreview || community.icon_url} className={cn("absolute inset-0 w-full h-full object-cover", !(iconPreview || community.icon_url) && "hidden")} />
+                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                        <Camera className="text-white" size={24} />
+                     </div>
+                     {!iconPreview && !community.icon_url && <Camera className="text-muted-foreground" size={24} />}
+                     <input type="file" accept="image/*" className="hidden" onChange={handleIconChange}/>
+                  </label>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground block mb-1">Community Name</label>
+                  <input type="text" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} className="w-full p-2 bg-transparent border border-border rounded text-[15px] focus:outline-none focus:border-primary"/>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground block mb-1">Description</label>
+                  <textarea value={editForm.description} onChange={e => setEditForm({...editForm, description: e.target.value})} className="w-full p-2 bg-transparent border border-border rounded text-[15px] focus:outline-none focus:border-primary min-h-[80px]"/>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground block mb-1">Rules</label>
+                  <textarea value={editForm.rules} onChange={e => setEditForm({...editForm, rules: e.target.value})} className="w-full p-2 bg-transparent border border-border rounded text-[15px] focus:outline-none focus:border-primary min-h-[120px]" placeholder="1. Be respectful..."/>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                 <button onClick={() => { setIsEditing(false); setIconFile(null); setBannerFile(null); }} className="px-5 py-2 font-medium hover:bg-muted rounded-full">Cancel</button>
+                 <button onClick={handleSaveCommunity} disabled={isSaving} className="px-5 py-2 bg-primary text-primary-foreground font-bold rounded-full disabled:opacity-50 flex items-center gap-2">
+                   {isSaving && <Loader2 size={16} className="animate-spin" />}
+                   {isSaving ? 'Saving...' : 'Save Changes'}
+                 </button>
+              </div>
+            </div>
+         </div>
+      )}
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../lib/store';
-import { ArrowLeft, Calendar, User, MessageSquareOff, Link as LinkIcon, BadgeCheck, X, Camera, Loader2 } from 'lucide-react';
+import { ArrowLeft, Calendar, User, MessageSquareOff, Link as LinkIcon, BadgeCheck, X, Camera, Loader2, Trophy, Target, Zap } from 'lucide-react';
 import { formatRelativeTime, cn } from '../lib/utils';
 import { PostSkeleton, EmptyState } from '../components/UIStates';
 import PostCard from '../components/PostCard';
@@ -202,6 +202,9 @@ export default function Profile() {
 
   const isOwnProfile = currentUser?.id === profile.id;
   const showGoldBadge = profile.role === 'creator' || profile.role === 'admin';
+  const displayXp = profile.xp || 0;
+  const displayLevel = profile.level || 1;
+  const displayStreak = profile.streak || 0;
 
   return (
     <div className="w-full relative">
@@ -273,6 +276,21 @@ export default function Profile() {
              )}
            </div>
            <div className="text-[15px] text-muted-foreground">@{profile.username}</div>
+        </div>
+
+        {/* Gamification Stats */}
+        <div className="mt-4 flex flex-wrap gap-2 text-sm">
+           <div className="bg-gradient-to-r from-orange-500/10 to-orange-600/10 text-orange-600 border border-orange-500/20 px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5">
+             <Trophy size={14} /> Level {displayLevel}
+           </div>
+           <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 text-blue-500 border border-blue-500/20 px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5">
+             <Target size={14} /> {displayXp} XP Base
+           </div>
+           {displayStreak > 0 && (
+              <div className="bg-gradient-to-r from-red-500/10 to-pink-500/10 text-red-500 border border-red-500/20 px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5">
+                <Zap size={14} className="fill-red-500" /> {displayStreak} Day Streak!
+              </div>
+           )}
         </div>
 
         <div className="mt-3 text-[15px] whitespace-pre-wrap">{profile.bio || 'Bio goes here.'}</div>

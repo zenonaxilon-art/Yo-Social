@@ -137,6 +137,10 @@ export default function Home() {
 
       setContent('');
       removeImage();
+      
+      // Gamification: Give XP for posting
+      useAppStore.getState().gainXp(15);
+      
     } catch (e: any) {
       console.error("Error posting:", e);
       alert("Failed to create post: " + (e.message || "Unknown error"));

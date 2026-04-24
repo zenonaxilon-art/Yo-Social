@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Search, Bell, Mail, User, Store, Users } from 'lucide-react';
+import { Home, Search, Bell, Mail, User, Store, Users, Video } from 'lucide-react';
 import { useAppStore } from '../lib/store';
 import { cn } from '../lib/utils';
 
@@ -9,9 +9,9 @@ export default function MobileNav() {
 
   const navItems = [
     { name: 'Home', path: '/', icon: Home },
+    { name: 'Explore', path: '/explore', icon: Search },
+    { name: 'Reels', path: '/reels', icon: Video },
     { name: 'Communities', path: '/communities', icon: Users },
-    { name: 'Store', path: '/marketplace', icon: Store },
-    { name: 'Notifications', path: '/notifications', icon: Bell, unread: unreadNotifications > 0 },
     { name: 'Messages', path: '/messages', icon: Mail, unread: unreadMessages > 0 },
     { name: 'Profile', path: `/profile/${profile?.username}`, icon: User },
   ];

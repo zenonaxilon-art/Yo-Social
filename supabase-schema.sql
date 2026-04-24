@@ -175,6 +175,22 @@ create table public.reports (
 -- create policy "Users can insert reports." on public.reports for insert with check (auth.uid() = reporter_id);
 -- create policy "Admins can view and edit reports." on public.reports for all using ((select is_admin from public.users where id = auth.uid()) = true);
 
+-- Reels Table
+create table public.reels (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references public.users on delete cascade not null,
+  video_url text not null,
+  caption text,
+  likes_count int default 0,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Note:
+-- alter table public.reels enable row level security;
+-- create policy "Reels are viewable by everyone." on public.reels for select using (true);
+-- create policy "Users can insert their own reels." on public.reels for insert with check (auth.uid() = user_id);
+-- create policy "Users can delete own reels." on public.reels for delete using (auth.uid() = user_id);
+
 -- Bookmarks Table
 create table public.bookmarks (
   user_id uuid references public.users on delete cascade not null,

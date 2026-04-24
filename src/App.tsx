@@ -16,9 +16,7 @@ import MobileNav from './components/MobileNav';
 
 import Communities from './pages/Communities';
 import CommunityDetail from './pages/CommunityDetail';
-
-import Communities from './pages/Communities';
-import CommunityDetail from './pages/CommunityDetail';
+import Reels from './pages/Reels';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, sessionChecked } = useAppStore();
@@ -115,6 +113,7 @@ export default function App() {
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Home />} />
           <Route path="explore" element={<Explore />} />
+          <Route path="reels" element={<Reels />} />
           <Route path="notifications" element={<Notifications />} />
           <Route path="messages" element={<Inbox />} />
           <Route path="messages/:userId" element={<Inbox />} />

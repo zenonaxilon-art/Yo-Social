@@ -17,6 +17,9 @@ import MobileNav from './components/MobileNav';
 import Communities from './pages/Communities';
 import CommunityDetail from './pages/CommunityDetail';
 
+import Communities from './pages/Communities';
+import CommunityDetail from './pages/CommunityDetail';
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, sessionChecked } = useAppStore();
 

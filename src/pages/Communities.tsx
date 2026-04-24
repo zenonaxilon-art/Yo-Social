@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../lib/store';
-import { Users, Plus, ShieldCheck } from 'lucide-react';
+import { Users, Plus, ShieldCheck, Search, Star } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { EmptyState } from '../components/UIStates';
 
@@ -10,6 +10,7 @@ export default function Communities() {
   const navigate = useNavigate();
   const [myCommunities, setMyCommunities] = useState<any[]>([]);
   const [exploreCommunities, setExploreCommunities] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
   // Create Modal
@@ -36,14 +37,10 @@ export default function Communities() {
       setMyCommunities(myMemberships.map(m => m.communities));
     }
 
-    // Fetch popular/all communities (excluding ones I'm in for simplicity, or just all)
+    // Fetch popular/all communities
     const myIds = myMemberships ? myMemberships.map(m => m.community_id) : [];
     
     let query = supabase.from('communities').select('*').order('created_at', { ascending: false }).limit(20);
-    
-    if (myIds.length > 0) {
-      // Supabase trick to exclude UUIDs isn't perfectly supported via simple not.in but let's just fetch and filter
-    }
 
     const { data: allComms } = await query;
     if (allComms) {
@@ -57,7 +54,6 @@ export default function Communities() {
     if (!name.trim() || !profile) return;
     setCreating(true);
     
-    // Convert to URL-safe name for uniqueness roughly
     const cleanName = name.trim();
 
     try {
@@ -74,7 +70,6 @@ export default function Communities() {
        }
 
        if (data) {
-          // Immediately make them admin
           await supabase.from('community_members').insert({
             community_id: data.id,
             user_id: profile.id,
@@ -93,6 +88,20 @@ export default function Communities() {
     }
   };
 
+  const filteredMyCommunities = myCommunities.filter(c => 
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (c.description && c.description.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  const filteredExplore = exploreCommunities.filter(c => 
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (c.description && c.description.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  // We consider the first two non-empty explore communities as 'Featured'
+  const featured = filteredExplore.slice(0, 2);
+  const others = filteredExplore.slice(2);
+
   return (
     <div className="w-full pb-20">
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border px-4 py-3 flex justify-between items-center">
@@ -105,7 +114,18 @@ export default function Communities() {
         </button>
       </div>
 
-      <div className="px-4 mt-6">
+      <div className="px-4 mt-4">
+        <div className="relative mb-6">
+          <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
+          <input 
+            type="text" 
+            placeholder="Search communities by name or description..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-muted/30 border border-border rounded-full py-2 pl-9 pr-4 text-[14px] focus:outline-none focus:border-primary transition-colors placeholder:text-muted-foreground"
+          />
+        </div>
+
         <h2 className="font-bold text-lg mb-4 flex items-center gap-2">
            <ShieldCheck size={20} className="text-primary" /> My Communities
         </h2>
@@ -114,18 +134,18 @@ export default function Communities() {
              <div className="h-20 bg-muted rounded-xl w-full"></div>
              <div className="h-20 bg-muted rounded-xl w-full"></div>
            </div>
-        ) : myCommunities.length === 0 ? (
+        ) : filteredMyCommunities.length === 0 ? (
            <div className="text-muted-foreground p-4 bg-muted/30 rounded-xl text-center text-sm">
-             You haven't joined any communities yet.
+             {searchQuery ? "No matching communities found in your list." : "You haven't joined any communities yet."}
            </div>
         ) : (
            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-             {myCommunities.map(c => (
+             {filteredMyCommunities.map(c => (
                <Link to={`/communities/${c.id}`} key={c.id} className="p-4 border border-border rounded-xl bg-card hover:bg-muted/50 transition-colors flex items-center gap-4">
                  <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center text-primary font-bold text-xl shrink-0">
                     {c.icon_url ? <img src={c.icon_url} className="w-full h-full object-cover rounded-lg" /> : c.name.charAt(0).toUpperCase()}
                  </div>
-                 <div className="overflow-hidden">
+                 <div className="overflow-hidden flex-1">
                     <h3 className="font-bold text-base truncate">{c.name}</h3>
                     <p className="text-sm text-muted-foreground truncate">{c.description || 'No description'}</p>
                  </div>
@@ -134,8 +154,29 @@ export default function Communities() {
            </div>
         )}
 
+        {featured.length > 0 && (
+           <div className="mt-8 mb-6">
+              <h2 className="font-bold text-lg mb-4 flex items-center gap-2">
+                 <Star size={20} className="text-yellow-500 fill-yellow-500" /> Featured Communities
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                 {featured.map(c => (
+                   <Link to={`/communities/${c.id}`} key={c.id} className="p-4 border border-border rounded-xl bg-gradient-to-br from-yellow-500/10 to-orange-500/10 hover:from-yellow-500/20 hover:to-orange-500/20 transition-colors flex items-center gap-4 relative overflow-hidden">
+                     <div className="w-12 h-12 rounded-lg bg-background flex items-center justify-center text-yellow-600 font-bold text-xl shrink-0 border border-yellow-500/20 shadow-sm">
+                        {c.icon_url ? <img src={c.icon_url} className="w-full h-full object-cover rounded-lg" /> : c.name.charAt(0).toUpperCase()}
+                     </div>
+                     <div className="overflow-hidden flex-1 z-10">
+                        <h3 className="font-bold text-base truncate flex items-center gap-1.5">{c.name}</h3>
+                        <p className="text-sm text-muted-foreground truncate">{c.description || 'No description'}</p>
+                     </div>
+                   </Link>
+                 ))}
+              </div>
+           </div>
+        )}
+
         <h2 className="font-bold text-lg mt-8 mb-4 flex items-center gap-2">
-           <Users size={20} className="text-primary" /> Explore Communities
+           <Users size={20} className="text-primary" /> Explore More
         </h2>
         
         {loading ? (
@@ -143,18 +184,18 @@ export default function Communities() {
                <div className="h-20 bg-muted rounded-xl w-full"></div>
                <div className="h-20 bg-muted rounded-xl w-full"></div>
              </div>
-        ) : exploreCommunities.length === 0 ? (
+        ) : others.length === 0 ? (
            <div className="text-muted-foreground p-4 bg-muted/30 rounded-xl text-center text-sm">
-             No more communities to explore right now.
+             {searchQuery ? "No matching communities found to explore." : "No more communities to explore right now."}
            </div>
         ) : (
            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-             {exploreCommunities.map(c => (
+             {others.map(c => (
                <Link to={`/communities/${c.id}`} key={c.id} className="p-4 border border-border rounded-xl bg-card hover:bg-muted/50 transition-colors flex items-center gap-4">
                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xl shrink-0">
                     {c.icon_url ? <img src={c.icon_url} className="w-full h-full object-cover rounded-lg" /> : c.name.charAt(0).toUpperCase()}
                  </div>
-                 <div className="overflow-hidden">
+                 <div className="overflow-hidden flex-1">
                     <h3 className="font-bold text-base truncate">{c.name}</h3>
                     <p className="text-sm text-muted-foreground truncate">{c.description || 'No description'}</p>
                  </div>

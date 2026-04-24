@@ -170,6 +170,11 @@ create table public.reports (
 -- create policy "Users can insert reports." on public.reports for insert with check (auth.uid() = reporter_id);
 -- create policy "Admins can view and edit reports." on public.reports for all using ((select is_admin from public.users where id = auth.uid()) = true);
 
+-- Note:
+-- alter table public.reports enable row level security;
+-- create policy "Users can insert reports." on public.reports for insert with check (auth.uid() = reporter_id);
+-- create policy "Admins can view and edit reports." on public.reports for all using ((select is_admin from public.users where id = auth.uid()) = true);
+
 -- Bookmarks Table
 create table public.bookmarks (
   user_id uuid references public.users on delete cascade not null,

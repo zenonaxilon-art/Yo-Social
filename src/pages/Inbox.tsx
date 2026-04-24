@@ -29,7 +29,10 @@ export default function Inbox() {
          if (msg && profile) {
             // If it belongs to active chat, append it
             if (activePartner && (msg.sender_id === activePartner.id || msg.receiver_id === activePartner.id)) {
-                setMessages(prev => [...prev, msg]);
+                setMessages(prev => {
+                   if (prev.find(m => m.id === msg.id)) return prev;
+                   return [...prev, msg];
+                });
                 scrollToBottom();
             }
             // Also refresh conversations list

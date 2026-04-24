@@ -143,6 +143,36 @@ export default function Admin() {
            </div>
         )}
 
+        {reports.length > 0 && (
+           <div className="mb-8">
+              <h2 className="font-bold text-lg mb-4 flex items-center gap-2">Post Reports <span className="bg-red-500 text-white rounded-full px-2 text-xs">{reports.length}</span></h2>
+              <div className="grid gap-3">
+                 {reports.map(report => (
+                    <div key={report.id} className="bg-card border border-border p-4 rounded-xl">
+                       <div className="flex justify-between items-start mb-3">
+                          <div>
+                             <div className="font-bold text-red-500">{report.reason}</div>
+                             <div className="text-xs text-muted-foreground mt-1">Reported by @{report.reporter?.username}</div>
+                          </div>
+                          <div className="flex gap-2">
+                             <button onClick={() => handleDismissReport(report.id)} className="px-3 py-1 bg-muted hover:bg-muted/80 rounded font-medium text-xs transition-colors">Dismiss</button>
+                             <button onClick={() => handleDeletePost(report.target_id, report.id)} className="px-3 py-1 bg-red-500 text-white hover:bg-red-600 rounded font-medium text-xs transition-colors flex items-center gap-1"><Trash2 size={12}/> Delete Post</button>
+                          </div>
+                       </div>
+                       {report.post ? (
+                          <div className="bg-muted/30 p-3 rounded-lg border border-border/50 text-sm">
+                             {report.post.content}
+                             {report.post.image_url && <img src={report.post.image_url} className="mt-2 h-20 object-cover rounded" />}
+                          </div>
+                       ) : (
+                          <div className="text-sm text-muted-foreground italic">Post has been deleted.</div>
+                       )}
+                    </div>
+                 ))}
+              </div>
+           </div>
+        )}
+
         <div className="relative mb-6">
           <Search className="absolute left-3 top-3 text-muted-foreground w-5 h-5" />
           <input

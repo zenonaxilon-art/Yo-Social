@@ -149,6 +149,31 @@ function ReelItem({ reel, profile }: { reel: any, profile: any }) {
   const [viewsCount, setViewsCount] = useState(reel.views_count || 0);
   const [sharesCount, setSharesCount] = useState(reel.shares_count || 0);
   const [hasViewed, setHasViewed] = useState(false);
+  
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [loadingFollow, setLoadingFollow] = useState(false);
+
+  useEffect(() => {
+    if (profile && profile.id !== reel.user_id) {
+       supabase.from('follows').select('*').eq('follower_id', profile.id).eq('following_id', reel.user_id).single().then(({data}) => {
+          if (data) setIsFollowing(true);
+       });
+    }
+  }, [profile, reel.user_id]);
+
+  const handleFollow = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!profile) return;
+    setLoadingFollow(true);
+    if (isFollowing) {
+       await supabase.from('follows').delete().eq('follower_id', profile.id).eq('following_id', reel.user_id);
+       setIsFollowing(false);
+    } else {
+       await supabase.from('follows').insert({ follower_id: profile.id, following_id: reel.user_id });
+       setIsFollowing(true);
+    }
+    setLoadingFollow(false);
+  };
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -207,6 +232,9 @@ function ReelItem({ reel, profile }: { reel: any, profile: any }) {
            text: reel.caption || 'Check out this reel!',
            url: window.location.href
         }).catch(console.error);
+     } else {
+        navigator.clipboard.writeText(window.location.href);
+        alert('Link copied to clipboard!');
      }
   };
 
@@ -238,7 +266,18 @@ function ReelItem({ reel, profile }: { reel: any, profile: any }) {
                       {reel.users?.is_verified && <BadgeCheck size={16} className={reel.users?.role === 'admin' ? "text-yellow-400" : "text-blue-400"} />}
                    </div>
                    {profile?.id !== reel.user_id && (
-                     <button className="ml-2 px-3 py-1 rounded-full border border-white/80 text-sm font-medium hover:bg-white/20 transition-colors backdrop-blur-sm">Follow</button>
+                     <button 
+                       onClick={handleFollow}
+                       disabled={loadingFollow}
+                       className={cn(
+                          "ml-2 px-3 py-1 rounded-full border text-sm font-medium transition-colors backdrop-blur-sm disabled:opacity-50",
+                          isFollowing 
+                             ? "bg-white/20 border-white/30 hover:bg-white/30 text-white" 
+                             : "bg-primary border-primary text-primary-foreground hover:bg-primary/90"
+                       )}
+                     >
+                        {isFollowing ? 'Following' : 'Follow'}
+                     </button>
                    )}
                 </Link>
                 {reel.caption && (

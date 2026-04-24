@@ -93,7 +93,7 @@ export default function Reels() {
   }
 
   return (
-    <div className="w-full h-screen bg-black overflow-y-scroll overscroll-y-none snap-y snap-mandatory hide-scrollbar pb-[env(safe-area-inset-bottom)] sm:pb-0 relative" style={{ WebkitOverflowScrolling: 'touch' }}>
+    <div className="w-full h-[100dvh] bg-black overflow-y-scroll overscroll-y-none snap-y snap-mandatory hide-scrollbar relative z-0" style={{ WebkitOverflowScrolling: 'touch' }}>
        
        {/* Top Nav for Mobile */}
        <div className="fixed top-0 left-0 right-0 z-20 px-4 py-4 bg-gradient-to-b from-black/60 to-transparent flex justify-between items-center text-white sm:hidden pointer-events-none">
@@ -220,22 +220,37 @@ function ReelItem({ reel, profile }: { reel: any, profile: any }) {
     setLoadingFollow(false);
   };
 
+  const [isVisible, setIsVisible] = useState(false);
+  const [isNear, setIsNear] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    const observer = new IntersectionObserver(
+    // Observer for lazy loading (near viewport)
+    const nearObserver = new IntersectionObserver(
       ([entry]) => {
+         setIsNear(entry.isIntersecting);
+      },
+      { rootMargin: '100% 0px' } // 1 viewport boundary above/below
+    );
+
+    // Observer for playing (in viewport)
+    const playObserver = new IntersectionObserver(
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting);
         if (entry.isIntersecting) {
-          videoRef.current?.play().catch(() => {});
+          if (videoRef.current) {
+            videoRef.current.play().catch(() => {});
+          }
           setIsPlaying(true);
           
           if (!hasViewed) {
              setHasViewed(true);
              setViewsCount(prev => prev + 1);
-             // Increment view count in DB
              supabase.from('reels').update({ views_count: (reel.views_count || 0) + 1 }).eq('id', reel.id).then();
           }
         } else {
-          videoRef.current?.pause();
           if (videoRef.current) {
+             videoRef.current.pause();
              videoRef.current.currentTime = 0;
           }
           setIsPlaying(false);
@@ -244,14 +259,18 @@ function ReelItem({ reel, profile }: { reel: any, profile: any }) {
       { threshold: 0.6 }
     );
 
-    if (videoRef.current) {
-      observer.observe(videoRef.current);
+    if (containerRef.current) {
+      nearObserver.observe(containerRef.current);
+      playObserver.observe(containerRef.current);
     }
 
     return () => {
-      if (videoRef.current) observer.unobserve(videoRef.current);
+      if (containerRef.current) {
+        nearObserver.unobserve(containerRef.current);
+        playObserver.unobserve(containerRef.current);
+      }
     };
-  }, [hasViewed]);
+  }, [hasViewed, reel.id, reel.views_count]);
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -308,11 +327,11 @@ function ReelItem({ reel, profile }: { reel: any, profile: any }) {
      if (!newComment.trim() || !profile) return;
      setPostingComment(true);
      try {
-       const { error } = await supabase.from('comments').insert({
+       const { data, error } = await supabase.from('comments').insert({
           reel_id: reel.id,
           user_id: profile.id,
           content: newComment.trim()
-       });
+       }).select('*, users:user_id(username, display_name, profile_picture_url, is_verified, role)').single();
        
        if (error) {
           console.error("Comment insert error:", error);
@@ -320,11 +339,14 @@ function ReelItem({ reel, profile }: { reel: any, profile: any }) {
           return;
        }
 
+       if (data) {
+          setComments(prev => [...prev, data]);
+       }
+
        const newCount = commentsCount + 1;
        setCommentsCount(newCount);
        supabase.from('reels').update({ comments_count: newCount }).eq('id', reel.id).then();
        setNewComment('');
-       fetchComments();
      } catch (err) {
        console.error(err);
      } finally {
@@ -333,17 +355,19 @@ function ReelItem({ reel, profile }: { reel: any, profile: any }) {
   };
 
   return (
-    <div className="w-full h-[100dvh] snap-start relative bg-black flex justify-center overflow-hidden">
+    <div ref={containerRef} className="w-full h-[100dvh] snap-start relative bg-black flex justify-center overflow-hidden">
        {/* Video */}
-       <video 
-         ref={videoRef}
-         src={reel.video_url}
-         className="w-full h-full object-contain sm:max-w-md relative z-0 bg-black"
-         loop
-         playsInline
-         preload="metadata"
-         onClick={togglePlay}
-       />
+       {isNear && (
+         <video 
+           ref={videoRef}
+           src={reel.video_url}
+           className="w-full h-full object-contain sm:max-w-md relative z-0 bg-black"
+           loop
+           playsInline
+           preload="metadata"
+           onClick={togglePlay}
+         />
+       )}
 
        {/* Overlay Controls */}
        <div className="absolute inset-0 z-10 sm:max-w-md mx-auto pointer-events-none flex flex-col justify-end pb-24 sm:pb-8 px-4">

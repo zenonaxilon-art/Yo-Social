@@ -93,7 +93,7 @@ export default function Reels() {
   }
 
   return (
-    <div className="w-full h-[100dvh] bg-black overflow-y-scroll overscroll-y-none snap-y snap-mandatory hide-scrollbar relative z-0" style={{ WebkitOverflowScrolling: 'touch' }}>
+    <div className="w-full h-[calc(100dvh-64px)] sm:h-[100dvh] bg-black overflow-y-scroll overscroll-y-none snap-y snap-mandatory hide-scrollbar relative z-0" style={{ WebkitOverflowScrolling: 'touch' }}>
        
        {/* Top Nav for Mobile */}
        <div className="fixed top-0 left-0 right-0 z-20 px-4 py-4 bg-gradient-to-b from-black/60 to-transparent flex justify-between items-center text-white sm:hidden pointer-events-none">
@@ -355,7 +355,7 @@ function ReelItem({ reel, profile }: { reel: any, profile: any }) {
   };
 
   return (
-    <div ref={containerRef} className="w-full h-[100dvh] snap-start relative bg-black flex justify-center overflow-hidden">
+    <div ref={containerRef} className="w-full h-[calc(100dvh-64px)] sm:h-[100dvh] snap-always snap-start relative bg-black flex justify-center overflow-hidden">
        {/* Video */}
        {isNear && (
          <video 

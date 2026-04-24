@@ -43,20 +43,32 @@ create table public.posts (
 -- Likes Table
 create table public.likes (
   id uuid default uuid_generate_v4() primary key,
-  post_id uuid references public.posts on delete cascade not null,
+  post_id uuid references public.posts on delete cascade,
+  reel_id uuid references public.reels on delete cascade,
   user_id uuid references public.users on delete cascade not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  unique(post_id, user_id)
+  unique(post_id, user_id),
+  unique(reel_id, user_id)
 );
+
+-- Note: to retroactively add columns to an existing table, run:
+-- alter table public.likes alter column post_id drop not null;
+-- alter table public.likes add column reel_id uuid references public.reels(id) on delete cascade;
+-- alter table public.likes add constraint likes_reel_id_user_id_key unique (reel_id, user_id);
 
 -- Comments Table
 create table public.comments (
   id uuid default uuid_generate_v4() primary key,
-  post_id uuid references public.posts on delete cascade not null,
+  post_id uuid references public.posts on delete cascade,
+  reel_id uuid references public.reels on delete cascade,
   user_id uuid references public.users on delete cascade not null,
   content text not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+-- Note: to retroactively add columns to an existing table, run:
+-- alter table public.comments alter column post_id drop not null;
+-- alter table public.comments add column reel_id uuid references public.reels(id) on delete cascade;
 
 -- Follows Table
 create table public.follows (
@@ -197,6 +209,7 @@ create table public.reels (
 -- alter table public.reels enable row level security;
 -- create policy "Reels are viewable by everyone." on public.reels for select using (true);
 -- create policy "Users can insert their own reels." on public.reels for insert with check (auth.uid() = user_id);
+-- create policy "Everyone can update reel counts." on public.reels for update using (true);
 -- create policy "Users can delete own reels." on public.reels for delete using (auth.uid() = user_id);
 
 -- Bookmarks Table

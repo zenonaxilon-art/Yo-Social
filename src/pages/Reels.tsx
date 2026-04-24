@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../lib/store';
 import { Heart, MessageCircle, Share2, MoreVertical, BadgeCheck, User, Plus, Upload, Loader2, X } from 'lucide-react';
@@ -14,6 +14,7 @@ export default function Reels() {
   // Upload state
   const [showUpload, setShowUpload] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [caption, setCaption] = useState('');
 
@@ -31,6 +32,16 @@ export default function Reels() {
   const handleUpload = async () => {
      if (!videoFile || !profile) return;
      setUploading(true);
+     setUploadProgress(0);
+     
+     // Simulate progress for UI since supabase js doesn't support progress events natively on simple uploads
+     const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+           if (prev >= 95) return 95;
+           return prev + Math.floor(Math.random() * 10);
+        });
+     }, 500);
+
      try {
        const fileExt = videoFile.name.split('.').pop();
        const fileName = `${Math.random()}.${fileExt}`;
@@ -41,8 +52,11 @@ export default function Reels() {
           console.error("Upload error:", uploadError);
           alert("Failed to upload video. Ensure 'post_images' bucket accepts mp4 or create a 'reels' bucket.");
           setUploading(false);
+          clearInterval(progressInterval);
           return;
        }
+
+       setUploadProgress(100);
 
        const { data: urlData } = supabase.storage.from('post_images').getPublicUrl(fileName);
        
@@ -60,6 +74,7 @@ export default function Reels() {
           setShowUpload(false);
           setVideoFile(null);
           setCaption('');
+          setUploadProgress(0);
           fetchReels(); // Refresh
        } else {
           console.error(error);
@@ -68,6 +83,7 @@ export default function Reels() {
      } catch (e) {
        console.error(e);
      } finally {
+       clearInterval(progressInterval);
        setUploading(false);
      }
   };
@@ -77,7 +93,7 @@ export default function Reels() {
   }
 
   return (
-    <div className="w-full h-screen bg-black overflow-y-scroll snap-y snap-mandatory hide-scrollbar pb-[env(safe-area-inset-bottom)] sm:pb-0 relative">
+    <div className="w-full h-screen bg-black overflow-y-scroll overscroll-y-none snap-y snap-mandatory hide-scrollbar pb-[env(safe-area-inset-bottom)] sm:pb-0 relative" style={{ WebkitOverflowScrolling: 'touch' }}>
        
        {/* Top Nav for Mobile */}
        <div className="fixed top-0 left-0 right-0 z-20 px-4 py-4 bg-gradient-to-b from-black/60 to-transparent flex justify-between items-center text-white sm:hidden pointer-events-none">
@@ -119,10 +135,16 @@ export default function Reels() {
                 <button 
                   onClick={handleUpload}
                   disabled={!videoFile || uploading}
-                  className="w-full bg-primary text-primary-foreground font-bold py-3 rounded-full disabled:opacity-50 hover:bg-primary/90 transition-colors flex justify-center items-center gap-2"
+                  className="w-full bg-primary text-primary-foreground font-bold py-3 rounded-full disabled:opacity-50 hover:bg-primary/90 transition-colors flex justify-center items-center gap-2 relative overflow-hidden"
                 >
-                  {uploading && <Loader2 size={18} className="animate-spin" />}
-                  {uploading ? 'Uploading...' : 'Post Reel'}
+                  {uploading && (
+                    <div 
+                      className="absolute left-0 top-0 bottom-0 bg-primary-foreground/20 transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  )}
+                  {uploading && <Loader2 size={18} className="animate-spin z-10" />}
+                  <span className="z-10">{uploading ? `Uploading... ${uploadProgress}%` : 'Post Reel'}</span>
                 </button>
              </div>
           </div>
@@ -141,17 +163,24 @@ export default function Reels() {
   );
 }
 
-function ReelItem({ reel, profile }: { reel: any, profile: any }) {
+function ReelItem({ reel, profile }: { key?: React.Key, reel: any, profile: any }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(reel.likes_count || 0);
   const [viewsCount, setViewsCount] = useState(reel.views_count || 0);
   const [sharesCount, setSharesCount] = useState(reel.shares_count || 0);
+  const [commentsCount, setCommentsCount] = useState(reel.comments_count || 0);
   const [hasViewed, setHasViewed] = useState(false);
   
   const [isFollowing, setIsFollowing] = useState(false);
   const [loadingFollow, setLoadingFollow] = useState(false);
+
+  // Comments State
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<any[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [postingComment, setPostingComment] = useState(false);
 
   useEffect(() => {
     if (profile && profile.id !== reel.user_id) {
@@ -160,6 +189,22 @@ function ReelItem({ reel, profile }: { reel: any, profile: any }) {
        });
     }
   }, [profile, reel.user_id]);
+
+  useEffect(() => {
+     if (profile) {
+        supabase.from('likes').select('*').eq('reel_id', reel.id).eq('user_id', profile.id).single().then(({data}) => {
+           if (data) setLiked(true);
+        });
+     }
+  }, [profile, reel.id]);
+
+  const fetchComments = async () => {
+    const { data } = await supabase.from('comments')
+      .select('*, users:user_id(username, display_name, profile_picture_url, is_verified, role)')
+      .eq('reel_id', reel.id)
+      .order('created_at', { ascending: true });
+    if (data) setComments(data);
+  };
 
   const handleFollow = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -216,11 +261,21 @@ function ReelItem({ reel, profile }: { reel: any, profile: any }) {
     }
   };
 
-  const handleLike = () => {
-     setLiked(!liked);
-     const newCount = liked ? likesCount - 1 : likesCount + 1;
-     setLikesCount(newCount);
-     supabase.from('reels').update({ likes_count: newCount }).eq('id', reel.id).then();
+  const handleLike = async () => {
+     if (!profile) return;
+     if (liked) {
+       await supabase.from('likes').delete().eq('reel_id', reel.id).eq('user_id', profile.id);
+       const newCount = Math.max(0, likesCount - 1);
+       setLikesCount(newCount);
+       setLiked(false);
+       supabase.from('reels').update({ likes_count: newCount }).eq('id', reel.id).then();
+     } else {
+       await supabase.from('likes').insert({ reel_id: reel.id, user_id: profile.id });
+       const newCount = likesCount + 1;
+       setLikesCount(newCount);
+       setLiked(true);
+       supabase.from('reels').update({ likes_count: newCount }).eq('id', reel.id).then();
+     }
   };
 
   const handleShare = () => {
@@ -238,13 +293,42 @@ function ReelItem({ reel, profile }: { reel: any, profile: any }) {
      }
   };
 
+  const handleToggleComments = () => {
+     if (!showComments) {
+        fetchComments();
+     }
+     setShowComments(!showComments);
+  };
+
+  const submitComment = async (e: React.FormEvent) => {
+     e.preventDefault();
+     if (!newComment.trim() || !profile) return;
+     setPostingComment(true);
+     try {
+       await supabase.from('comments').insert({
+          reel_id: reel.id,
+          user_id: profile.id,
+          content: newComment.trim()
+       });
+       const newCount = commentsCount + 1;
+       setCommentsCount(newCount);
+       supabase.from('reels').update({ comments_count: newCount }).eq('id', reel.id).then();
+       setNewComment('');
+       fetchComments();
+     } catch (err) {
+       console.error(err);
+     } finally {
+       setPostingComment(false);
+     }
+  };
+
   return (
     <div className="w-full h-[100dvh] snap-start relative bg-black flex justify-center overflow-hidden">
        {/* Video */}
        <video 
          ref={videoRef}
          src={reel.video_url}
-         className="w-full h-full object-cover sm:max-w-md relative z-0"
+         className="w-full h-full object-contain sm:max-w-md relative z-0 bg-black"
          loop
          playsInline
          onClick={togglePlay}
@@ -298,11 +382,11 @@ function ReelItem({ reel, profile }: { reel: any, profile: any }) {
                    </div>
                    <span className="text-white text-xs font-medium drop-shadow-md">{likesCount}</span>
                 </button>
-                <button onClick={() => alert("Comments feature coming soon!")} className="flex flex-col items-center gap-1 group">
+                <button onClick={handleToggleComments} className="flex flex-col items-center gap-1 group">
                    <div className="w-12 h-12 bg-black/20 backdrop-blur-md rounded-full flex items-center justify-center transition-transform group-active:scale-90">
                       <MessageCircle size={26} className="text-white drop-shadow-md" />
                    </div>
-                   <span className="text-white text-xs font-medium drop-shadow-md">{reel.comments_count || 0}</span>
+                   <span className="text-white text-xs font-medium drop-shadow-md">{commentsCount}</span>
                 </button>
                 <button onClick={handleShare} className="flex flex-col items-center gap-1 group">
                    <div className="w-12 h-12 bg-black/20 backdrop-blur-md rounded-full flex items-center justify-center transition-transform group-active:scale-90">
@@ -313,6 +397,52 @@ function ReelItem({ reel, profile }: { reel: any, profile: any }) {
              </div>
           </div>
        </div>
+       
+       {showComments && (
+         <div className="absolute inset-x-0 bottom-0 top-[30%] bg-card z-50 rounded-t-2xl sm:max-w-md sm:mx-auto flex flex-col shadow-2xl border-t border-border animate-in slide-in-from-bottom-full">
+            <div className="p-4 border-b border-border flex justify-between items-center shrink-0">
+               <h3 className="font-bold text-lg">{commentsCount} Comments</h3>
+               <button onClick={() => setShowComments(false)} className="p-2 bg-muted/50 rounded-full hover:bg-muted transition-colors">
+                  <X size={20} className="text-foreground" />
+               </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+               {comments.length === 0 && (
+                  <div className="text-center text-muted-foreground mt-10">No comments yet. Start the conversation!</div>
+               )}
+               {comments.map(c => (
+                  <div key={c.id} className="flex gap-2">
+                     <Link to={`/profile/${c.users?.username}`} className="w-8 h-8 rounded-full bg-muted overflow-hidden shrink-0 mt-1">
+                        {c.users?.profile_picture_url ? <img src={c.users.profile_picture_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold text-xs">{c.users?.display_name?.charAt(0)}</div>}
+                     </Link>
+                     <div className="flex-1">
+                        <div className="flex items-baseline gap-2">
+                           <Link to={`/profile/${c.users?.username}`} className="font-bold text-sm hover:underline">{c.users?.display_name}</Link>
+                           <span className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <p className="text-sm text-foreground mt-0.5">{c.content}</p>
+                     </div>
+                  </div>
+               ))}
+            </div>
+
+            <form onSubmit={submitComment} className="p-4 border-t border-border bg-card shrink-0 px-4 sm:px-6 mb-[env(safe-area-inset-bottom)] pb-safe relative">
+               <div className="flex gap-2 relative bg-muted/30 border border-border rounded-full p-1 pl-4">
+                  <input 
+                    type="text" 
+                    value={newComment}
+                    onChange={e => setNewComment(e.target.value)}
+                    placeholder="Add comment..." 
+                    className="flex-1 bg-transparent text-sm focus:outline-none"
+                  />
+                  <button disabled={!newComment.trim() || postingComment} type="submit" className="bg-primary text-primary-foreground disabled:opacity-50 p-2 rounded-full transition-colors">
+                    <MessageCircle size={18} className="rotate-90 fill-current" />
+                  </button>
+               </div>
+            </form>
+         </div>
+       )}
 
     </div>
   );

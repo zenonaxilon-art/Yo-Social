@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../lib/store';
 import { Link } from 'react-router-dom';
 import { formatRelativeTime } from '../lib/utils';
 import { Heart, MessageCircle, Trash2, Send, Bookmark, BadgeCheck, Repeat, Flag, X, Loader2 } from 'lucide-react';
 
-export default function PostCard({ post, onDelete, onUpdate }: { post: any, onDelete?: (id: string) => void, onUpdate?: () => void }) {
+export default function PostCard({ post, onDelete, onUpdate }: { key?: React.Key, post: any, onDelete?: (id: string) => void, onUpdate?: () => void }) {
   const { profile } = useAppStore();
   
   // Resolve whether this is a repost or not

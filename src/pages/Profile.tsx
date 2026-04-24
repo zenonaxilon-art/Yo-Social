@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../lib/store';
-import { ArrowLeft, Calendar, User, MessageSquareOff, Link as LinkIcon, BadgeCheck, X, Camera, Loader2, Trophy, Target, Zap } from 'lucide-react';
+import { ArrowLeft, Calendar, User, MessageSquareOff, Link as LinkIcon, BadgeCheck, X, Camera, Loader2, Trophy, Target, Zap, Heart, Video } from 'lucide-react';
 import { formatRelativeTime, cn } from '../lib/utils';
 import { PostSkeleton, EmptyState } from '../components/UIStates';
 import PostCard from '../components/PostCard';
@@ -31,6 +31,8 @@ export default function Profile() {
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  const [reels, setReels] = useState<any[]>([]);
+
   useEffect(() => {
     fetchProfile();
   }, [username]);
@@ -46,7 +48,7 @@ export default function Profile() {
          website_url: user.website_url || ''
       });
       
-      const fetchProfilePosts = async (uid: string) => {
+      const fetchProfileData = async (uid: string) => {
         let query = supabase.from('posts').select(`
           *, 
           users:user_id ( username, display_name, profile_picture_url, is_verified, role ),
@@ -60,9 +62,12 @@ export default function Profile() {
            const { data: userPostsFb } = await supabase.from('posts').select(`*, users:user_id ( username, display_name, profile_picture_url, is_verified, role )`).eq('user_id', uid).order('created_at', { ascending: false });
            if (userPostsFb) setPosts(userPostsFb);
         }
+
+        const { data: userReels } = await supabase.from('reels').select('*, users:user_id(username, display_name, profile_picture_url, is_verified, role)').eq('user_id', uid).order('created_at', { ascending: false });
+        if (userReels) setReels(userReels);
       };
       
-      fetchProfilePosts(user.id);
+      fetchProfileData(user.id);
 
       const { count: followers } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', user.id);
       const { count: following } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', user.id);
@@ -320,7 +325,36 @@ export default function Profile() {
       
       {/* Posts list */}
       <div className="px-4 sm:px-8 py-6 space-y-4">
-        {activeTab !== 'posts' ? (
+        {activeTab === 'media' ? (
+           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {reels.map(reel => (
+                 <Link to={`/reels`} key={`reel-${reel.id}`} className="aspect-[9/16] bg-muted relative rounded-xl overflow-hidden group">
+                    <video src={reel.video_url} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                       <span className="text-white font-bold flex items-center justify-center gap-2 mb-2"><Heart size={16}/> {reel.likes_count || 0}</span>
+                       <span className="text-white font-bold flex items-center justify-center gap-2 mb-2"><Video size={16}/> {reel.views_count || 0}</span>
+                    </div>
+                    <div className="absolute top-2 right-2 bg-black/60 rounded-full p-1 text-white">
+                       <Camera size={14} />
+                    </div>
+                 </Link>
+              ))}
+              {posts.filter(p => !!p.image_url).map(post => (
+                 <div key={`post-${post.id}`} className="aspect-square bg-muted relative rounded-xl overflow-hidden">
+                    <img src={post.image_url} className="w-full h-full object-cover" />
+                 </div>
+              ))}
+              {reels.length === 0 && posts.filter(p => !!p.image_url).length === 0 && (
+                 <div className="col-span-full">
+                    <EmptyState 
+                       icon={<Camera size={32} />}
+                       title="No media yet"
+                       description="This user hasn't posted any photos or reels."
+                    />
+                 </div>
+              )}
+           </div>
+        ) : activeTab !== 'posts' ? (
            <EmptyState 
              icon={<MessageSquareOff size={32} />}
              title={`No ${activeTab} yet`}

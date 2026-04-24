@@ -182,8 +182,16 @@ create table public.reels (
   video_url text not null,
   caption text,
   likes_count int default 0,
+  views_count int default 0,
+  comments_count int default 0,
+  shares_count int default 0,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+-- Note:
+-- alter table public.reels add column views_count int default 0;
+-- alter table public.reels add column comments_count int default 0;
+-- alter table public.reels add column shares_count int default 0;
 
 -- Note:
 -- alter table public.reels enable row level security;

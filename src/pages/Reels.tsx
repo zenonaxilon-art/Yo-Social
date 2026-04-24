@@ -163,7 +163,7 @@ export default function Reels() {
   );
 }
 
-function ReelItem({ reel, profile }: { key?: React.Key, reel: any, profile: any }) {
+function ReelItem({ reel, profile }: { reel: any, profile: any }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [liked, setLiked] = useState(false);
@@ -235,6 +235,9 @@ function ReelItem({ reel, profile }: { key?: React.Key, reel: any, profile: any 
           }
         } else {
           videoRef.current?.pause();
+          if (videoRef.current) {
+             videoRef.current.currentTime = 0;
+          }
           setIsPlaying(false);
         }
       },
@@ -305,11 +308,18 @@ function ReelItem({ reel, profile }: { key?: React.Key, reel: any, profile: any 
      if (!newComment.trim() || !profile) return;
      setPostingComment(true);
      try {
-       await supabase.from('comments').insert({
+       const { error } = await supabase.from('comments').insert({
           reel_id: reel.id,
           user_id: profile.id,
           content: newComment.trim()
        });
+       
+       if (error) {
+          console.error("Comment insert error:", error);
+          alert("Failed to post comment. Ensure the database schema is updated to support reel comments.");
+          return;
+       }
+
        const newCount = commentsCount + 1;
        setCommentsCount(newCount);
        supabase.from('reels').update({ comments_count: newCount }).eq('id', reel.id).then();
@@ -331,6 +341,7 @@ function ReelItem({ reel, profile }: { key?: React.Key, reel: any, profile: any 
          className="w-full h-full object-contain sm:max-w-md relative z-0 bg-black"
          loop
          playsInline
+         preload="metadata"
          onClick={togglePlay}
        />
 
